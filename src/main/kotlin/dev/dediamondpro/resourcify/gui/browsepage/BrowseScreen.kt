@@ -104,6 +104,15 @@ class BrowseScreen(
     var loadingPage = false
     var currentQuery = ""
     var loadMoreBtn: IWidget? = null
+    // Search-as-you-type debounce. The tick-driven onUpdateListener on the
+    // search box compares `searchBox.text` against `lastObservedText` each
+    // tick; any diff resets `lastKeystrokeMs`. Once DEBOUNCE_MS of stillness
+    // has passed and the text differs from `currentQuery` (the last actually-
+    // issued search), it fires loadPage. `currentQuery` doubles as the "last
+    // fired query" so we don't keep a separate field.
+    var lastObservedText = ""
+    var lastKeystrokeMs = -1L
+    val DEBOUNCE_MS = 300L
     // Filter state, kept generic so any IService.getCategories /
     // getSortOptions shape works - we just round-trip ids back to the
     // service in search(). Different platforms can ship different group
@@ -127,6 +136,11 @@ class BrowseScreen(
             loadedCount = 0
             totalCount = 0
             currentQuery = searchBox.text ?: ""
+            // Snap debounce state so the tick observer doesn't re-fire the
+            // search we just issued manually (filter pill, platform/version
+            // change, Enter, button, type switch, initial load).
+            lastObservedText = currentQuery
+            lastKeystrokeMs = -1L
             resultsList.child(TextWidget(IKey.str("Searching...")).color(textSecondary))
         } else {
             loadMoreBtn?.let { resultsList.remove(it) }
@@ -458,6 +472,23 @@ class BrowseScreen(
         )
 
     triggerSearch = { loadPage(append = false) }
+    // Search-as-you-type. Runs on every client tick (~20Hz) via MUI2's per-
+    // widget onUpdate hook. We rely on currentQuery being kept in sync inside
+    // loadPage(!append), so a fire only happens when the visible text has
+    // actually diverged from what was last searched. loadingPage guard prevents
+    // overlapping requests; if a previous load is still pending, we just try
+    // again on the next tick.
+    searchBox.onUpdateListener { _ ->
+        val current = searchBox.text ?: ""
+        if (current != lastObservedText) {
+            lastObservedText = current
+            lastKeystrokeMs = System.currentTimeMillis()
+        } else if (lastKeystrokeMs >= 0 && current != currentQuery
+            && !loadingPage
+            && System.currentTimeMillis() - lastKeystrokeMs >= DEBOUNCE_MS) {
+            loadPage(append = false)
+        }
+    }
     // versionDropdownHolder sits at the top of the sidebar slot. The
     // dropdown's open menu paints downward and over the categories list;
     // by keeping it OUTSIDE the scrollable filtersList we avoid scroll-
