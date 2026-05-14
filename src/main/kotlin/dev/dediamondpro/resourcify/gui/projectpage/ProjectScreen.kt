@@ -673,7 +673,8 @@ class ProjectScreen(
     val iconSize = 40
     val projectIcon = AsyncIcon(project.getIconUrl(), iconSize).top(GUTTER).left(GUTTER)
     val textLeft = GUTTER + iconSize + 8
-    val authorText = "by ${project.getAuthor()}  §8•§r  ${project.getDownloads().formatCompact()} downloads"
+    val authorInfoColor = 0xFF3D444D.toInt()
+    val authorText = "by ${project.getAuthor()}  •  ${project.getDownloads().formatCompact()} downloads"
     val font = Minecraft.getMinecraft().fontRenderer
     val defaultGalleryButtonLeft = GUTTER + descListW + GALLERY_BUTTON_GAP + GALLERY_BUTTON_RIGHT_NUDGE
     val maxGalleryButtonLeft = verColLeft - HEADER_ACTION_BUTTONS_WIDTH - GALLERY_BUTTON_GAP
@@ -690,10 +691,9 @@ class ProjectScreen(
     }
     val header = TextWidget(IKey.str(project.getName()).style(EnumChatFormatting.BOLD).scale(1.5f))
         .top(GUTTER).left(textLeft)
-    val authorLine = TextWidget(
-        IKey.str(displayedAuthorText)
-            .style(EnumChatFormatting.GRAY)
-    ).top(GUTTER + 16).left(textLeft).width(authorLineWidth).height(12)
+    val authorLine = TextWidget(IKey.str(displayedAuthorText))
+        .top(GUTTER + 16).left(textLeft).width(authorLineWidth).height(12)
+        .color(authorInfoColor)
     // Long summaries should scroll rather than overflow the header strip.
     // Wrap in a SimpleList so vertical scroll kicks in when content > 28px.
     val summaryWidth = (galleryButtonLeft - textLeft - GALLERY_BUTTON_GAP).coerceAtLeast(20)
