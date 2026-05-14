@@ -28,21 +28,23 @@ public class ResourcifyConfigGui extends GuiConfig {
 
     private static List<IConfigElement> buildElements() {
         List<IConfigElement> list = new ArrayList<>();
-        list.add(new DummyConfigElement<String>(
-            "markdownTheme",
-            Config.Companion.getInstance().getMarkdownTheme(),
-            ConfigGuiType.STRING,
-            "resourcify.config.markdownTheme",
-            new String[] { "dark", "light" }) {
-
-            @Override
-            public void set(String value) {
-                super.set(value);
+        list.add(
+            new DummyConfigElement<String>(
+                "markdownTheme",
                 Config.Companion.getInstance()
-                    .setMarkdownTheme(value);
-                Config.Companion.save(Config.Companion.getInstance());
-            }
-        });
+                    .getMarkdownTheme(),
+                ConfigGuiType.STRING,
+                "resourcify.config.markdownTheme",
+                new String[] { "dark", "light" }) {
+
+                @Override
+                public void set(String value) {
+                    super.set(value);
+                    Config.Companion.getInstance()
+                        .setMarkdownTheme(value);
+                    Config.Companion.save(Config.Companion.getInstance());
+                }
+            });
         return list;
     }
 }

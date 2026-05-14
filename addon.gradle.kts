@@ -37,6 +37,13 @@ tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>().con
     relocate("org.commonmark", "dev.dediamondpro.resourcify.libs.commonmark")
 }
 
+// ktfmt (the Kotlin formatter spotless uses) crashes on JDK 25 with
+// NoClassDefFoundError com.facebook.ktfmt.format.Parser because of how
+// ktfmt initialises its kotlinx-coroutines fork. Disable just the Kotlin
+// step so spotlessApply works for everything else.
+tasks.matching { it.name == "spotlessKotlin" || it.name == "spotlessKotlinApply" || it.name == "spotlessKotlinCheck" || it.name == "spotlessKotlinDiagnose" }
+    .configureEach { enabled = false }
+
 tasks.withType<JavaExec>().configureEach {
     if (name.startsWith("runServer")) {
         doFirst("resourcifyStripClientOnlyMods") {
