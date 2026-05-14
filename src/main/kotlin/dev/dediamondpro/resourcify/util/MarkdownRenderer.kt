@@ -74,9 +74,17 @@ object MarkdownRenderer {
     private class BlockEmitter(private val out: MutableList<IWidget>, private val width: Int) : AbstractVisitor() {
 
         override fun visit(heading: Heading) {
-            val prefix = "§l" + "#".repeat(heading.level.coerceIn(1, 6)) + " §r§l"
+            // §e (yellow) for top-level, §6 (gold) for h2, §f (white bold) for h3+.
+            val color = when (heading.level) {
+                1 -> "§e§l"
+                2 -> "§6§l"
+                else -> "§f§l"
+            }
             val text = collectText(heading)
-            emitLines(prefix + text + "§r")
+            emitLines(color + text + "§r")
+            if (heading.level <= 2) {
+                emitLines("§8" + "-".repeat(60) + "§r")
+            }
             spacer()
         }
 

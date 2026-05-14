@@ -34,6 +34,7 @@ import dev.dediamondpro.resourcify.util.MarkdownRenderer
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiScreen
 import net.minecraft.client.gui.GuiScreenResourcePacks
+import net.minecraft.util.EnumChatFormatting
 import java.io.File
 
 private class SimpleButton : ButtonWidget<SimpleButton>()
@@ -46,11 +47,12 @@ class ProjectScreen(
     packsFolder: File,
     sourceParent: GuiScreen?,
 ) : ModularScreen(VintageResourcify.MODID, { _ ->
+    val descriptionList = SimpleList()
+        .child(TextWidget(IKey.str("Loading description...")))
     val versionsList = SimpleList()
+        .child(TextWidget(IKey.str("Loading versions...")))
 
     fun loadVersions() {
-        versionsList.removeAll()
-        versionsList.child(TextWidget(IKey.str("Loading versions...")))
         project.getVersions().thenAccept { versions ->
             Minecraft.getMinecraft().func_152344_a {
                 versionsList.removeAll()
@@ -62,14 +64,14 @@ class ProjectScreen(
                 }
                 matching.forEach { version: IVersion ->
                     val row = Flow.row()
-                        .height(20).widthRel(1f).margin(0, 0, 0, 2)
+                        .height(22).widthRel(1f).margin(0, 0, 0, 3)
                         .child(
                             TextWidget(IKey.str(version.getName()))
-                                .heightRel(1f).left(4).widthRel(0.75f)
+                                .heightRel(1f).left(4).widthRel(0.62f)
                         )
                         .child(
                             SimpleButton()
-                                .size(48, 16).right(2).top(2)
+                                .size(56, 16).right(2).top(3)
                                 .overlay(IKey.str("Install"))
                                 .onMousePressed { btn ->
                                     if (btn == 0) {
@@ -84,15 +86,12 @@ class ProjectScreen(
         }
     }
 
-    val header = TextWidget(IKey.str("${project.getName()} by ${project.getAuthor()}"))
-        .top(6).left(8)
-    val summary = TextWidget(IKey.str(project.getSummary()))
-        .top(20).left(8).right(8)
-    val descriptionList = SimpleList()
-    descriptionList.top(36).left(8).right(8).height(60)
-        .child(TextWidget(IKey.str("Loading description...")))
-
     fun loadDescription() {
+        // Width: panel is full-screen; description column gets 60% of the
+        // content area. Account for the list's scrollbar and outer padding.
+        // We don't know exact pixel count here so use a conservative cap;
+        // the wrap target is just used to break lines, not to clip.
+        val width = (Minecraft.getMinecraft().displayWidth * 0.55 / 2).toInt().coerceAtLeast(200)
         project.getDescription().thenAccept { rawMd ->
             Minecraft.getMinecraft().func_152344_a {
                 descriptionList.removeAll()
@@ -100,22 +99,42 @@ class ProjectScreen(
                     descriptionList.child(TextWidget(IKey.str("(no description)")))
                     return@func_152344_a
                 }
-                // The panel is 320 wide with 8px L/R margin and the list has
-                // its own scrollbar inset; 290 is a safe content width.
-                MarkdownRenderer.render(rawMd, 290).forEach { descriptionList.child(it) }
+                MarkdownRenderer.render(rawMd, width).forEach { descriptionList.child(it) }
             }
         }
     }
 
-    versionsList.top(100).left(8).right(8).bottom(8)
     loadVersions()
     loadDescription()
 
-    ModularPanel.defaultPanel("vintage-resourcify-project", 320, 220)
+    val header = TextWidget(IKey.str(project.getName()).style(EnumChatFormatting.BOLD).scale(1.5f))
+        .top(6).left(10)
+    val authorLine = TextWidget(IKey.str("by ${project.getAuthor()}").style(EnumChatFormatting.GRAY))
+        .top(22).left(10)
+    val summary = TextWidget(IKey.str(project.getSummary()))
+        .top(34).left(10).right(10)
+
+    val body = Flow.row()
+        .top(54).left(10).right(10).bottom(10)
+        .child(descriptionList.widthRel(0.6f).heightRel(1f))
+        .child(
+            Flow.column()
+                .left(8).widthRel(0.4f).heightRel(1f).margin(8, 0, 0, 0)
+                .child(
+                    TextWidget(IKey.str("Versions").style(EnumChatFormatting.BOLD))
+                        .height(12).widthRel(1f)
+                )
+                .child(versionsList.widthRel(1f).heightRel(1f))
+        )
+
+    // .full() makes the panel cover the whole game screen instead of using
+    // the default 176x166 dialog box.
+    ModularPanel.defaultPanel("vintage-resourcify-project")
+        .full()
         .child(header)
+        .child(authorLine)
         .child(summary)
-        .child(descriptionList)
-        .child(versionsList)
+        .child(body)
 })
 
 private fun install(version: IVersion, packsFolder: File, sourceParent: GuiScreen?) {

@@ -87,7 +87,7 @@ class BrowseScreen(
                     resultsList.child(TextWidget(IKey.str("No results")))
                     return@func_152344_a
                 }
-                projects.take(20).forEach { project ->
+                projects.take(50).forEach { project ->
                     resultsList.child(
                         SimpleButton()
                             .height(14)
@@ -119,7 +119,8 @@ class BrowseScreen(
         .child(TextWidget(IKey.str("Loading...")))
     runSearch()
 
-    ModularPanel.defaultPanel("vintage-resourcify-browse", 320, 220)
+    ModularPanel.defaultPanel("vintage-resourcify-browse")
+        .full()
         .child(topRow)
         .child(resultsList)
 })
