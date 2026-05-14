@@ -81,28 +81,69 @@ class BrowseScreen(
         }
     }
     val resultsList = SimpleList()
+    // Pagination state. Modrinth and CurseForge both return one page per
+    // search call (Modrinth: 20 per page); we append additional pages on
+    // demand instead of fetching them all up front so an empty/broad query
+    // doesn't hammer the API.
+    var loadedCount = 0
+    var totalCount = 0
+    var loadingPage = false
+    var currentQuery = ""
+    var loadMoreBtn: IWidget? = null
 
-    fun runSearch() {
-        resultsList.removeAll()
-        resultsList.child(TextWidget(IKey.str("Searching...")).color(textSecondary))
-        val query = searchBox.text ?: ""
+    fun loadPage(append: Boolean) {
+        if (loadingPage) return
+        loadingPage = true
+        if (!append) {
+            resultsList.removeAll()
+            loadedCount = 0
+            totalCount = 0
+            currentQuery = searchBox.text ?: ""
+            resultsList.child(TextWidget(IKey.str("Searching...")).color(textSecondary))
+        } else {
+            loadMoreBtn?.let { resultsList.remove(it) }
+            loadMoreBtn = null
+            val loadingMore = TextWidget(IKey.str("Loading more...")).color(textSecondary)
+            resultsList.child(loadingMore)
+            loadMoreBtn = loadingMore
+        }
+        val query = currentQuery
+        val offset = loadedCount
         MultiThreading.supplyAsync {
             try {
-                service.search(query, defaultSortKey, listOf(Platform.getMcVersion()), emptyList(), 0, type)
+                service.search(query, defaultSortKey, listOf(Platform.getMcVersion()), emptyList(), offset, type)
             } catch (e: Exception) {
                 VintageResourcify.LOG.warn("Search failed", e)
                 null
             }
         }.thenAccept { result ->
             Minecraft.getMinecraft().func_152344_a {
-                resultsList.removeAll()
+                loadingPage = false
+                if (!append) resultsList.removeAll()
+                else loadMoreBtn?.let { resultsList.remove(it); loadMoreBtn = null }
+
                 val projects: List<IProject> = result?.projects ?: emptyList()
-                if (projects.isEmpty()) {
+                totalCount = result?.totalCount ?: loadedCount
+                if (loadedCount == 0 && projects.isEmpty()) {
                     resultsList.child(TextWidget(IKey.str("No results")).color(textSecondary))
                     return@func_152344_a
                 }
-                projects.take(50).forEach { project ->
+                projects.forEach { project ->
                     resultsList.child(buildCard(project, packsFolder, sourceParent, cardBg, textPrimary, textSecondary))
+                }
+                loadedCount += projects.size
+                if (loadedCount < totalCount && projects.isNotEmpty()) {
+                    val btn = SimpleButton()
+                        // Right margin clears the ListWidget scrollbar. Cards
+                        // don't need this because their content uses
+                        // right(INNER_PAD); the button is a single
+                        // edge-to-edge overlay and would otherwise paint
+                        // under the scrollbar track.
+                        .widthRel(1f).height(20).margin(0, 10, 0, CARD_GAP)
+                        .overlay(IKey.str("Load more (${loadedCount}/${totalCount})"))
+                        .onMousePressed { b -> if (b == 0) { loadPage(append = true); true } else false }
+                    resultsList.child(btn)
+                    loadMoreBtn = btn
                 }
             }
         }
@@ -114,13 +155,13 @@ class BrowseScreen(
             SimpleButton()
                 .size(54, 16).right(0)
                 .overlay(IKey.str("Search"))
-                .onMousePressed { btn -> if (btn == 0) { runSearch(); true } else false }
+                .onMousePressed { btn -> if (btn == 0) { loadPage(append = false); true } else false }
         )
 
-    triggerSearch = ::runSearch
+    triggerSearch = { loadPage(append = false) }
     resultsList.top(36).left(10).right(10).bottom(10)
         .child(TextWidget(IKey.str("Loading...")).color(textSecondary))
-    runSearch()
+    loadPage(append = false)
 
     ModularPanel.defaultPanel("vintage-resourcify-browse")
         .full()
