@@ -26,6 +26,12 @@ import java.util.concurrent.CompletableFuture
 interface IService {
     fun getName(): String
 
+    /**
+     * Stable, lowercase identifier used in the local install index and any
+     * persisted metadata. Distinct from [getName] which is shown in the UI.
+     */
+    fun getPlatformId(): String = getName().lowercase()
+
     fun isProjectTypeSupported(type: ProjectType): Boolean
 
     fun search(

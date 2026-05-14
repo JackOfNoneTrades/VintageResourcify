@@ -39,7 +39,10 @@ dependencies {
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:NotEnoughItems:2.8.98-GTNH:dev")
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:GTNHLib:0.9.66:dev")
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:Hodgepodge:2.7.140:dev")
-    runtimeOnlyNonPublishable("com.github.GTNewHorizons:Angelica:2.1.22:dev")
+    // devOnly (compileOnly + runtimeOnly) so MixinShaderPackScreen's target
+    // class is resolvable to the mixin annotation processor. Still soft - we
+    // wrap any actual Iris calls in IrisHelper reflection.
+    devOnlyNonPublishable("com.github.GTNewHorizons:Angelica:2.1.22:dev")
     runtimeOnlyNonPublishable("curse.maven:archaicfix-677782:6785842")
     devOnlyNonPublishable(rfg.deobf("curse.maven:catalogue-vintage-1465746:7695645"))
 }

@@ -1,0 +1,173 @@
+/*
+ * This file is part of Resourcify
+ * Copyright (C) 2024 DeDiamondPro
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License Version 3 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package dev.dediamondpro.resourcify.gui.pack
+
+import dev.dediamondpro.resourcify.VintageResourcify
+import dev.dediamondpro.resourcify.util.IrisHelper
+import dev.dediamondpro.resourcify.util.LocalIndex
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.Gui
+import net.minecraft.client.renderer.OpenGlHelper
+import net.minecraft.client.renderer.Tessellator
+import net.minecraft.util.ResourceLocation
+import org.lwjgl.opengl.GL11
+import java.io.File
+
+/**
+ * Draws the small "source: <platform>" badge over a pack entry's icon area,
+ * sourced from the local install index. Pack files we did not install (and
+ * thus have no index entry for) get no badge.
+ *
+ * Platform icons live under `assets/resourcify/platform/<id>.png`. The legacy
+ * `67.png` is included so support for 67minecraft (or whatever lands later)
+ * doesn't need an additional asset drop later.
+ */
+object PackOverlayRenderer {
+
+    private const val BADGE_BACKGROUND_ALPHA = 0.55f
+
+    private val knownPlatforms = setOf("modrinth", "curseforge", "67", "git")
+    private val textures = mutableMapOf<String, ResourceLocation>()
+
+    private fun textureFor(platform: String): ResourceLocation? {
+        val key = when (platform.lowercase()) {
+            "curse", "curseforge" -> "curse"
+            "modrinth" -> "modrinth"
+            "67minecraft", "67" -> "67"
+            "git", "github" -> "git"
+            else -> null
+        } ?: return null
+        return textures.getOrPut(key) { ResourceLocation(VintageResourcify.MODID, "platform/$key.png") }
+    }
+
+    fun lookupPlatform(folder: File, file: File): String? =
+        LocalIndex.forFolder(folder).lookupByFile(file)?.platform
+
+    /**
+     * Draw the platform icon at [x],[y] sized [size]x[size]. Caller picks the
+     * anchor (bottom-right of resource pack icons, right-edge of shader
+     * rows). A controlled semi-transparent dark backdrop improves readability against pack
+     * thumbnails of varying contrast. Also captures a hover request - the
+     * tooltip is drained by [drainPendingTooltip] at the end of the host
+     * screen's drawScreen so it paints above the pack list.
+     *
+     * GL state is set defensively because vanilla pack rendering leaves
+     * BLEND off and the FontRenderer in font texture; without these the
+     * badge ends up tinted by whatever color the previous draw set.
+     */
+    fun drawBadge(platform: String, x: Int, y: Int, size: Int, mouseX: Int = Int.MIN_VALUE, mouseY: Int = Int.MIN_VALUE) {
+        val tex = textureFor(platform) ?: return
+        // Isolate GL state. Pack rows / Iris lists leave GL_BLEND on with
+        // non-standard color/alpha; pushing/popping makes the badge render
+        // identical regardless of caller. Draw the backdrop via a direct
+        // untextured quad rather than Gui.drawRect so the blend func and alpha
+        // are fully controlled here.
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT or GL11.GL_COLOR_BUFFER_BIT or GL11.GL_CURRENT_BIT)
+        try {
+            GL11.glEnable(GL11.GL_BLEND)
+            GL11.glDisable(GL11.GL_TEXTURE_2D)
+            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO)
+            GL11.glColor4f(0f, 0f, 0f, BADGE_BACKGROUND_ALPHA)
+            val t = Tessellator.instance
+            val x0 = x - 1
+            val y0 = y - 1
+            val x1 = x + size + 1
+            val y1 = y + size + 1
+            t.startDrawingQuads()
+            t.setColorRGBA_F(0f, 0f, 0f, BADGE_BACKGROUND_ALPHA)
+            addQuad(t, x0, y0, x1, y1)
+            t.draw()
+            // Now blit the icon with standard transparency.
+            GL11.glEnable(GL11.GL_TEXTURE_2D)
+            GL11.glEnable(GL11.GL_BLEND)
+            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO)
+            GL11.glColor4f(1f, 1f, 1f, 1f)
+            Minecraft.getMinecraft().textureManager.bindTexture(tex)
+            Gui.func_152125_a(x, y, 0f, 0f, size, size, size, size, size.toFloat(), size.toFloat())
+        } finally {
+            GL11.glPopAttrib()
+        }
+        // Capture hover so the host drawScreen can paint the tooltip on top.
+        if (mouseX in x..(x + size) && mouseY in y..(y + size)) {
+            pendingTooltipText = "Source: ${displayName(platform)}"
+            pendingTooltipX = mouseX
+            pendingTooltipY = mouseY
+        }
+    }
+
+    @Volatile private var pendingTooltipText: String? = null
+    @Volatile private var pendingTooltipX: Int = 0
+    @Volatile private var pendingTooltipY: Int = 0
+
+    /**
+     * Render and clear the most recently-captured hover tooltip. Called from
+     * the pack/shader screen's drawScreen TAIL so the tooltip paints above
+     * the list, not behind it.
+     */
+    fun drainPendingTooltip() {
+        val text = pendingTooltipText ?: return
+        pendingTooltipText = null
+        val mc = Minecraft.getMinecraft()
+        val fr = mc.fontRenderer ?: return
+        val pad = 3
+        val tw = fr.getStringWidth(text)
+        val boxW = tw + pad * 2
+        val boxH = fr.FONT_HEIGHT + pad * 2
+        val screenW = mc.currentScreen?.width ?: Int.MAX_VALUE
+        val screenH = mc.currentScreen?.height ?: Int.MAX_VALUE
+        // Prefer to the right of the cursor; flip to the left if that
+        // would clip past the screen's right edge.
+        var bx = pendingTooltipX + 8
+        if (bx + boxW > screenW - 2) bx = (pendingTooltipX - boxW - 8).coerceAtLeast(2)
+        var by = pendingTooltipY - boxH - 2
+        if (by < 2) by = (pendingTooltipY + 12).coerceAtMost(screenH - boxH - 2)
+        GL11.glDisable(GL11.GL_BLEND)
+        GL11.glColor4f(1f, 1f, 1f, 1f)
+        Gui.drawRect(bx, by, bx + boxW, by + boxH, 0xFF000000.toInt())
+        fr.drawString(text, bx + pad, by + pad, 0xFFFFFFFF.toInt(), false)
+    }
+
+    private fun displayName(platform: String): String = when (platform.lowercase()) {
+        "curse", "curseforge" -> "CurseForge"
+        "modrinth" -> "Modrinth"
+        "67minecraft", "67" -> "67Minecraft"
+        "git", "github" -> "GitHub"
+        else -> platform.replaceFirstChar { it.uppercase() }
+    }
+
+    private fun addQuad(t: Tessellator, left: Int, top: Int, right: Int, bottom: Int) {
+        t.addVertex(left.toDouble(), bottom.toDouble(), 0.0)
+        t.addVertex(right.toDouble(), bottom.toDouble(), 0.0)
+        t.addVertex(right.toDouble(), top.toDouble(), 0.0)
+        t.addVertex(left.toDouble(), top.toDouble(), 0.0)
+    }
+
+    /** Resolve the Iris shaderpacks folder once per call; cheap and safe to call from a render path. */
+    fun shaderpacksFolder(): File = IrisHelper.getShaderpacksFolder()
+
+    fun resourcePacksFolder(): File = Minecraft.getMinecraft().resourcePackRepository.dirResourcepacks
+
+    /** Convert a pack name (as Iris uses it - e.g. "MyShader") to the file we recorded under. */
+    fun shaderPackFile(folder: File, packName: String): File? {
+        val zip = File(folder, "$packName.zip")
+        if (zip.exists()) return zip
+        val raw = File(folder, packName)
+        if (raw.exists()) return raw
+        return null
+    }
+}

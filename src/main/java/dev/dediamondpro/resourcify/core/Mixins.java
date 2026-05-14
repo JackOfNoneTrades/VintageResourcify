@@ -27,6 +27,27 @@ public class Mixins extends FentMixins {
             .side(Side.CLIENT)
             .phase(Phase.EARLY)
             .build();
+        registry.mixin("ResourcePackRepositoryEntryAccessor")
+            .side(Side.CLIENT)
+            .phase(Phase.EARLY)
+            .build();
+        registry.mixin("MixinResourcePackListEntry")
+            .side(Side.CLIENT)
+            .phase(Phase.EARLY)
+            .build();
+        // Angelica ships Iris's ShaderPackScreen. Only inject when angelica
+        // is loaded - the mixin target class is otherwise absent and the
+        // mixin processor would refuse to apply.
+        registry.mixin("MixinShaderPackScreen")
+            .modid("angelica")
+            .side(Side.CLIENT)
+            .phase(Phase.EARLY)
+            .build();
+        registry.mixin("MixinIrisShaderPackEntry")
+            .modid("angelica")
+            .side(Side.CLIENT)
+            .phase(Phase.EARLY)
+            .build();
     }
 
     public static java.util.List<String> getEarlyMixinsForLoader() {

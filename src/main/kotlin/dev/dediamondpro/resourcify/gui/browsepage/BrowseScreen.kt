@@ -37,6 +37,7 @@ import dev.dediamondpro.resourcify.services.IProject
 import dev.dediamondpro.resourcify.services.ProjectType
 import dev.dediamondpro.resourcify.services.ServiceRegistry
 import dev.dediamondpro.resourcify.util.AsyncIcon
+import dev.dediamondpro.resourcify.util.IrisHelper
 import dev.dediamondpro.resourcify.util.MultiThreading
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiScreen
@@ -58,12 +59,18 @@ private const val ICON_SIZE = 44
 private const val INNER_PAD = 6
 
 class BrowseScreen(
-    type: ProjectType,
-    packsFolder: File,
+    initialType: ProjectType,
+    initialFolder: File,
     sourceParent: GuiScreen?,
 ) : ModularScreen(VintageResourcify.MODID, { _ ->
-    val service = ServiceRegistry.getDefaultService(type)
-    val defaultSortKey = service.getSortOptions().keys.firstOrNull() ?: ""
+    // Type, service, sort and folder are all "var" because the user can flip
+    // between resource packs and shaders via the top tab row without leaving
+    // the screen. Cards capture the current type/folder at construction time;
+    // switching tabs clears the results and rebuilds cards with new values.
+    var currentType = initialType
+    var service = ServiceRegistry.getDefaultService(currentType)
+    var defaultSortKey = service.getSortOptions().keys.firstOrNull() ?: ""
+    var packsFolder = initialFolder
 
     val isLight = Config.instance.markdownTheme.equals("light", ignoreCase = true)
     val cardBg = if (isLight) 0x14000000 else 0x28FFFFFF
@@ -109,15 +116,20 @@ class BrowseScreen(
         }
         val query = currentQuery
         val offset = loadedCount
+        val typeAtRequest = currentType
+        val folderAtRequest = packsFolder
         MultiThreading.supplyAsync {
             try {
-                service.search(query, defaultSortKey, listOf(Platform.getMcVersion()), emptyList(), offset, type)
+                service.search(query, defaultSortKey, listOf(Platform.getMcVersion()), emptyList(), offset, typeAtRequest)
             } catch (e: Exception) {
                 VintageResourcify.LOG.warn("Search failed", e)
                 null
             }
         }.thenAccept { result ->
             Minecraft.getMinecraft().func_152344_a {
+                // If the user switched tabs while the request was in flight,
+                // ignore the stale results entirely.
+                if (typeAtRequest != currentType) return@func_152344_a
                 loadingPage = false
                 if (!append) resultsList.removeAll()
                 else loadMoreBtn?.let { resultsList.remove(it); loadMoreBtn = null }
@@ -128,8 +140,9 @@ class BrowseScreen(
                     resultsList.child(TextWidget(IKey.str("No results")).color(textSecondary))
                     return@func_152344_a
                 }
+                val platformIdAtRequest = service.getPlatformId()
                 projects.forEach { project ->
-                    resultsList.child(buildCard(project, packsFolder, sourceParent, cardBg, textPrimary, textSecondary))
+                    resultsList.child(buildCard(project, typeAtRequest, folderAtRequest, sourceParent, platformIdAtRequest, cardBg, textPrimary, textSecondary))
                 }
                 loadedCount += projects.size
                 if (loadedCount < totalCount && projects.isNotEmpty()) {
@@ -149,7 +162,42 @@ class BrowseScreen(
         }
     }
 
-    val topRow = Flow.row().top(10).left(10).right(10).height(16)
+    // Type switcher: two buttons, one per supported pack type. Hidden tab
+    // for shaders when Iris/Angelica isn't loaded. Width is set wide enough
+    // that "Resource Packs" fits on a single line at default font scale.
+    val shadersAvailable = IrisHelper.isPresent()
+    val packsTab = SimpleButton().size(112, 18)
+    val shadersTab = SimpleButton().size(112, 18)
+
+    fun tabLabel(label: String, selected: Boolean): String =
+        if (selected) "§f§n$label§r" else "§7$label§r"
+
+    fun refreshTabLabels() {
+        packsTab.overlay(IKey.str(tabLabel("Resource Packs", currentType == ProjectType.RESOURCE_PACK)))
+        shadersTab.overlay(IKey.str(tabLabel("Shaders", currentType == ProjectType.IRIS_SHADER)))
+    }
+    refreshTabLabels()
+
+    fun switchType(t: ProjectType) {
+        if (t == currentType) return
+        currentType = t
+        service = ServiceRegistry.getDefaultService(t)
+        defaultSortKey = service.getSortOptions().keys.firstOrNull() ?: ""
+        packsFolder = when (t) {
+            ProjectType.IRIS_SHADER -> IrisHelper.getShaderpacksFolder()
+            else -> Minecraft.getMinecraft().resourcePackRepository.dirResourcepacks
+        }
+        refreshTabLabels()
+        loadPage(append = false)
+    }
+    packsTab.onMousePressed { b -> if (b == 0) { switchType(ProjectType.RESOURCE_PACK); true } else false }
+    shadersTab.onMousePressed { b -> if (b == 0) { switchType(ProjectType.IRIS_SHADER); true } else false }
+
+    val tabRow = Flow.row().top(6).left(10).height(18)
+        .child(packsTab.margin(0, 4, 0, 0))
+        .apply { if (shadersAvailable) child(shadersTab) }
+
+    val searchRow = Flow.row().top(28).left(10).right(10).height(16)
         .child(searchBox.heightRel(1f).widthRel(1f).margin(0, 60, 0, 0))
         .child(
             SimpleButton()
@@ -159,21 +207,24 @@ class BrowseScreen(
         )
 
     triggerSearch = { loadPage(append = false) }
-    resultsList.top(36).left(10).right(10).bottom(10)
+    resultsList.top(50).left(10).right(10).bottom(10)
         .child(TextWidget(IKey.str("Loading...")).color(textSecondary))
     loadPage(append = false)
 
     ModularPanel.defaultPanel("vintage-resourcify-browse")
         .full()
-        .child(topRow)
+        .child(tabRow)
+        .child(searchRow)
         .child(resultsList)
 })
 
 /** Project result card: thumbnail + title + author + summary, clickable. */
 private fun buildCard(
     project: IProject,
+    type: ProjectType,
     packsFolder: File,
     sourceParent: GuiScreen?,
+    platformId: String,
     cardBg: Int,
     textPrimary: Int,
     textSecondary: Int,
@@ -205,7 +256,7 @@ private fun buildCard(
                     muiBefore?.let { Integer.toHexString(System.identityHashCode(it)) },
                 )
                 try {
-                    val newScreen = ProjectScreen(project, packsFolder, sourceParent)
+                    val newScreen = ProjectScreen(project, type, packsFolder, sourceParent, platformId)
                     // Go through MUI2's official entry point so UISettings,
                     // recipe-viewer integration, etc. get wired up. Calling
                     // displayGuiScreen on a hand-constructed wrapper skips

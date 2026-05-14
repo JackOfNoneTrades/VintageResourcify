@@ -17,7 +17,12 @@ public class MixinGuiScreenResourcePacks {
 
     @Inject(method = "drawScreen", at = @At("TAIL"))
     private void resourcify$drawAddButton(int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
-        PackScreensAddition.INSTANCE.onRender(ProjectType.RESOURCE_PACK);
+        PackScreensAddition.INSTANCE.onRender(
+            ProjectType.RESOURCE_PACK,
+            Minecraft.getMinecraft()
+                .getResourcePackRepository()
+                .getDirResourcepacks(),
+            (GuiScreen) (Object) this);
     }
 
     @Inject(method = "mouseClicked", at = @At("HEAD"))

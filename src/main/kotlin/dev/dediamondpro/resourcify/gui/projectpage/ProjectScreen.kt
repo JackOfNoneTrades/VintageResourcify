@@ -31,8 +31,10 @@ import dev.dediamondpro.resourcify.config.Config
 import dev.dediamondpro.resourcify.platform.Platform
 import dev.dediamondpro.resourcify.services.IProject
 import dev.dediamondpro.resourcify.services.IVersion
+import dev.dediamondpro.resourcify.services.ProjectType
 import dev.dediamondpro.resourcify.util.AsyncIcon
 import dev.dediamondpro.resourcify.util.DownloadManager
+import dev.dediamondpro.resourcify.util.IrisHelper
 import dev.dediamondpro.resourcify.util.MarkdownRenderer
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiScreen
@@ -56,8 +58,10 @@ private const val DESC_PAD = 8
 // closure rather than in instance fields.
 class ProjectScreen(
     project: IProject,
+    type: ProjectType,
     packsFolder: File,
     sourceParent: GuiScreen?,
+    platformId: String,
 ) : ModularScreen(VintageResourcify.MODID, { _ ->
     VintageResourcify.LOG.info("ProjectScreen lambda entry: project={}", project.getId())
     val themeName = Config.instance.markdownTheme.lowercase()
@@ -128,7 +132,7 @@ class ProjectScreen(
                                 .overlay(IKey.str("Install"))
                                 .onMousePressed { btn ->
                                     if (btn == 0) {
-                                        install(version, packsFolder, sourceParent)
+                                        install(version, project, type, packsFolder, sourceParent, platformId)
                                         true
                                     } else false
                                 }
@@ -201,7 +205,14 @@ class ProjectScreen(
         .child(versionsList)
 })
 
-private fun install(version: IVersion, packsFolder: File, sourceParent: GuiScreen?) {
+private fun install(
+    version: IVersion,
+    project: IProject,
+    type: ProjectType,
+    packsFolder: File,
+    sourceParent: GuiScreen?,
+    platformId: String,
+) {
     val url = version.getDownloadUrl() ?: run {
         VintageResourcify.LOG.warn("No download URL for version {}", version.getName())
         return
@@ -209,14 +220,33 @@ private fun install(version: IVersion, packsFolder: File, sourceParent: GuiScree
     if (!packsFolder.exists()) packsFolder.mkdirs()
     val target = File(packsFolder, version.getFileName())
     VintageResourcify.LOG.info("Installing {} -> {}", url, target)
-    if (target.exists()) Platform.closeResourcePack(target)
+    val isShader = type == ProjectType.IRIS_SHADER || type == ProjectType.OPTIFINE_SHADER
+    if (!isShader && target.exists()) Platform.closeResourcePack(target)
     DownloadManager.download(target, version.getSha1(), url, false) {
         VintageResourcify.LOG.info("Install complete: {}", target.name)
+        // Record into the per-folder install index so update + source-icon
+        // overlays know which platform/project this file came from.
+        try {
+            dev.dediamondpro.resourcify.util.LocalIndex
+                .forFolder(packsFolder)
+                .record(target, platformId, project.getId())
+        } catch (e: Throwable) {
+            VintageResourcify.LOG.warn("Failed to record install index entry", e)
+        }
         Minecraft.getMinecraft().func_152344_a {
-            Platform.reloadResourcePack(target)
-            Platform.reloadResources()
-            if (sourceParent != null) {
-                Minecraft.getMinecraft().displayGuiScreen(GuiScreenResourcePacks(sourceParent))
+            if (isShader) {
+                // Shaders are picked up on next ShaderPackScreen open; no
+                // ResourcePackRepository handle to refresh. Just return the
+                // user to Iris's screen so they can apply the new pack.
+                if (!IrisHelper.openShaderPackScreen(sourceParent) && sourceParent != null) {
+                    Minecraft.getMinecraft().displayGuiScreen(sourceParent)
+                }
+            } else {
+                Platform.reloadResourcePack(target)
+                Platform.reloadResources()
+                if (sourceParent != null) {
+                    Minecraft.getMinecraft().displayGuiScreen(GuiScreenResourcePacks(sourceParent))
+                }
             }
         }
     }
