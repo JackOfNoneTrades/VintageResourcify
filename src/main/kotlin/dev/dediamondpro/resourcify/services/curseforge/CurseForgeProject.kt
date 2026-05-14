@@ -54,7 +54,7 @@ data class CurseForgeProject(
     override fun getDescription(): CompletableFuture<String> {
         return descriptionRequest ?: supplyAsync {
             URL("${CurseForgeService.API}/mods/$id/description")
-                .getJson<Description>(headers = mapOf("x-api-key" to CurseForgeService.API_KEY))
+                .getJson<Description>(headers = CurseForgeService.requestHeaders())
                 ?.data ?: error("Failed to fetch description.")
         }.apply { descriptionRequest = this }
     }
@@ -86,7 +86,7 @@ data class CurseForgeProject(
     override fun getVersions(): CompletableFuture<List<IVersion>> {
         return (versionsRequest ?: supplyAsync {
             URL("${CurseForgeService.API}/mods/$id/files")
-                .getJson<Versions>(headers = mapOf("x-api-key" to CurseForgeService.API_KEY))
+                .getJson<Versions>(headers = CurseForgeService.requestHeaders())
                 ?.data?.filter { it.hasDownloadUrl() } ?: error("Failed to fetch versions.")
         }.apply { versionsRequest = this }) as CompletableFuture<List<IVersion>>
     }

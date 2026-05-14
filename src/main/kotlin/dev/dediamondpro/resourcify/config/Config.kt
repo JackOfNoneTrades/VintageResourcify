@@ -17,10 +17,12 @@
 
 package dev.dediamondpro.resourcify.config
 
+import dev.dediamondpro.resourcify.VintageResourcify
 import dev.dediamondpro.resourcify.services.modrinth.ModrinthService
 import dev.dediamondpro.resourcify.util.fromJson
 import dev.dediamondpro.resourcify.util.toJson
 import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
 
 class Config {
     var defaultService: String = ModrinthService.getName()
@@ -32,18 +34,25 @@ class Config {
     var shaderPacksEnabled: Boolean = true
     var worldsEnabled: Boolean = true
     var autoUpdateChecks: Boolean = true
+    var curseUserAgent: String = ""
+    var curseApiToken: String = ""
 
     // "light" or "dark". Used by MarkdownRenderer to pick GitHub-style palette.
     var markdownTheme: String = "dark"
 
     companion object {
         private val configFile = File("./config/resourcify.json")
-        val instance: Config
+        private val loadCallbacks = CopyOnWriteArrayList<Runnable>()
+
+        @JvmStatic
+        @Volatile
+        var instance: Config = load()
+            private set
 
         init {
             // Load the file and immediately save it so all new values get saved
-            instance = load()
             save(instance)
+            fireLoadCallbacks()
         }
 
         private fun load(): Config {
@@ -54,9 +63,47 @@ class Config {
             }
         }
 
+        @JvmStatic
+        fun addLoadCallback(callback: Runnable) {
+            addLoadCallback(callback, false)
+        }
+
+        @JvmStatic
+        fun addLoadCallback(callback: Runnable, fireImmediately: Boolean) {
+            loadCallbacks.add(callback)
+            if (fireImmediately) runLoadCallback(callback)
+        }
+
+        @JvmStatic
+        fun removeLoadCallback(callback: Runnable): Boolean {
+            return loadCallbacks.remove(callback)
+        }
+
+        @JvmStatic
+        fun reload(): Config {
+            instance = load()
+            save(instance)
+            fireLoadCallbacks()
+            return instance
+        }
+
         fun save(config: Config = instance) {
             configFile.outputStream().bufferedWriter().use {
                 it.write(config.toJson())
+            }
+        }
+
+        private fun fireLoadCallbacks() {
+            for (callback in loadCallbacks) {
+                runLoadCallback(callback)
+            }
+        }
+
+        private fun runLoadCallback(callback: Runnable) {
+            try {
+                callback.run()
+            } catch (t: Throwable) {
+                VintageResourcify.LOG.warn("Config load callback failed", t)
             }
         }
     }

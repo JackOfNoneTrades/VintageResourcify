@@ -55,7 +55,7 @@ data class CurseForgeVersion(
     override fun getChangeLog(): CompletableFuture<String> {
         return changeLogRequest ?: supplyAsync {
             URL("${CurseForgeService.API}/mods/$modId/files/$id/changelog")
-                .getJson<Changelog>(headers = mapOf("x-api-key" to CurseForgeService.API_KEY))
+                .getJson<Changelog>(headers = CurseForgeService.requestHeaders())
                 ?.data ?: error("Failed to fetch changelog.")
         }.apply { changeLogRequest = this }
     }
@@ -89,7 +89,7 @@ data class CurseForgeVersion(
             val projects: ModsResponse = "${CurseForgeService.API}/mods".toURL()
                 ?.postAndGetJson(
                     GetByIdProperty(deps.map { it.modId }),
-                    headers = mapOf("x-api-key" to CurseForgeService.API_KEY)
+                    headers = CurseForgeService.requestHeaders()
                 ) ?: error("Failed to fetch dependencies.")
             projects.data.map {
                 CurseForgeDependency(

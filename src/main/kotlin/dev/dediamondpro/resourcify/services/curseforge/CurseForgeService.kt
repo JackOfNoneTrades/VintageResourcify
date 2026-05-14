@@ -17,6 +17,7 @@
 
 package dev.dediamondpro.resourcify.services.curseforge
 
+import dev.dediamondpro.resourcify.config.Config
 import dev.dediamondpro.resourcify.platform.Platform
 import dev.dediamondpro.resourcify.services.*
 import dev.dediamondpro.resourcify.util.*
@@ -43,6 +44,16 @@ object CurseForgeService : IService {
     override fun getName(): String = "CurseForge"
     override fun isProjectTypeSupported(type: ProjectType): Boolean = type.getClassId() != null
 
+    fun requestHeaders(): Map<String, String> {
+        val headers = mutableMapOf(
+            "x-api-key" to (Config.instance.curseApiToken.trim().ifEmpty { API_KEY })
+        )
+        Config.instance.curseUserAgent.trim().takeIf { it.isNotEmpty() }?.let {
+            headers["User-Agent"] = it
+        }
+        return headers
+    }
+
     override fun search(
         query: String,
         sortBy: String,
@@ -66,7 +77,7 @@ object CurseForgeService : IService {
                 }
                 addParameter("categoryIds", "[${actualCategories.joinToString(",")}]")
                 addParameter("gameVersions", "[${minecraftVersions.joinToString(",") { "\"$it\"" }}]")
-            }.build().toURL().getJson<CurseForgeSearchData>(headers = mapOf("x-api-key" to API_KEY)).apply {
+            }.build().toURL().getJson<CurseForgeSearchData>(headers = requestHeaders()).apply {
                 this?.let { // Filter data packs out of resource packs
                     if (type != ProjectType.RESOURCE_PACK) return@let
                     projects = projects.filter { !it.getInternalCategories().any { c -> c.id == 5193 } }
@@ -86,7 +97,7 @@ object CurseForgeService : IService {
         minecraftVersions = supplyAsync {
             URL("$API/minecraft/version")
                 .getJson<CurseForgeMinecraftVersionsResponse>(
-                    headers = mapOf("x-api-key" to API_KEY),
+                    headers = requestHeaders(),
                     useCache = false
                 )?.data ?: error("Failed to fetch Minecraft versions.")
         }
@@ -116,7 +127,7 @@ object CurseForgeService : IService {
         categories = supplyAsync {
             URL("$API/categories?gameId=432")
                 .getJson<CurseForgeCategoryResponse>(
-                    headers = mapOf("x-api-key" to API_KEY),
+                    headers = requestHeaders(),
                     useCache = false
                 )?.data ?: error("Failed to fetch categories.")
         }
@@ -147,7 +158,7 @@ object CurseForgeService : IService {
     override fun getProjectsFromIds(ids: List<String>): Map<String, IProject> {
         return URL("$API/mods")
             .postAndGetJson<CurseForgeModsBatchResponse, CurseForgeModsBatch>(
-                CurseForgeModsBatch(ids.map { it.toInt() }), headers = mapOf("x-api-key" to API_KEY)
+                CurseForgeModsBatch(ids.map { it.toInt() }), headers = requestHeaders()
             )?.data?.associateBy { project -> ids.first { it == project.getId() } }
             ?: error("Failed to fetch mods.")
 
@@ -168,7 +179,7 @@ object CurseForgeService : IService {
             val result = URL("$API/fingerprints/432")
                 .postAndGetJson<CurseForgeFingerprintResponse, CurseForgeFingerprint>(
                     CurseForgeFingerprint(hashes.keys.map { it!! }.toList()),
-                    headers = mapOf("x-api-key" to API_KEY)
+                    headers = requestHeaders()
                 )?.data?.exactMatches?.filter {
                     hashes.containsKey(it.file.fileFingerprint)
                             // If there is no download url, we can't download this project so we ignore it
@@ -190,7 +201,7 @@ object CurseForgeService : IService {
                             // We only care about the most recent match
                             .addParameter("pageSize", "1")
                             .build().toURL()
-                            .getJson<CurseForgeProject.Versions>(headers = mapOf("x-api-key" to API_KEY))
+                            .getJson<CurseForgeProject.Versions>(headers = requestHeaders())
                             ?.data?.sortedByDescending {
                                 Instant.from(DateTimeFormatter.ISO_INSTANT.parse(it.getReleaseDate()))
                             }?.firstOrNull() ?: error("Failed to find matching version")

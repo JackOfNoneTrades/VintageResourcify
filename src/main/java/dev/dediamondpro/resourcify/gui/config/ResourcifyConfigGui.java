@@ -61,6 +61,38 @@ public class ResourcifyConfigGui extends GuiConfig {
                     Config.Companion.save(Config.Companion.getInstance());
                 }
             });
+        list.add(
+            new DummyConfigElement<String>(
+                "curseUserAgent",
+                Config.Companion.getInstance()
+                    .getCurseUserAgent(),
+                ConfigGuiType.STRING,
+                "resourcify.config.curse-user-agent") {
+
+                @Override
+                public void set(String value) {
+                    super.set(value);
+                    Config.Companion.getInstance()
+                        .setCurseUserAgent(value);
+                    Config.Companion.save(Config.Companion.getInstance());
+                }
+            });
+        list.add(
+            new DummyConfigElement<String>(
+                "curseApiToken",
+                Config.Companion.getInstance()
+                    .getCurseApiToken(),
+                ConfigGuiType.STRING,
+                "resourcify.config.curse-api-token") {
+
+                @Override
+                public void set(String value) {
+                    super.set(value);
+                    Config.Companion.getInstance()
+                        .setCurseApiToken(value);
+                    Config.Companion.save(Config.Companion.getInstance());
+                }
+            });
         return list;
     }
 }
