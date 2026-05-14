@@ -17,6 +17,7 @@
 
 package dev.dediamondpro.resourcify.util
 
+import com.cleanroommc.modularui.api.IMuiScreen
 import dev.dediamondpro.resourcify.VintageResourcify
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiConfirmOpenLink
@@ -59,6 +60,13 @@ object UrlOpener {
         if (mc.gameSettings.chatLinksPrompt) {
             mc.func_152344_a {
                 VintageResourcify.LOG.info("UrlOpener showing confirm for {}", url)
+                // Capture the MUI2 parent screen BEFORE the confirm steals
+                // the slot. We restore it after dismissal so MUI2's
+                // close-to-parent logic (popScreen, used when there's no
+                // player) doesn't bounce back to the GuiConfirmOpenLink
+                // instance.
+                val originalParent = (returnTo as? IMuiScreen)?.screen
+                    ?.context?.parentScreen
                 mc.displayGuiScreen(
                     GuiConfirmOpenLink(
                         { result, callbackId ->
@@ -68,6 +76,14 @@ object UrlOpener {
                             )
                             if (result) openUri(uri)
                             mc.displayGuiScreen(returnTo)
+                            // After the wrapper is back as currentScreen,
+                            // ClientScreenHandler.onGuiChanged just set its
+                            // parent to the confirm dialog. Overwrite that
+                            // with whatever the parent was before we ever
+                            // showed the confirm - typically the vanilla
+                            // resource pack screen / options menu.
+                            (returnTo as? IMuiScreen)?.screen
+                                ?.context?.setParentScreen(originalParent)
                         },
                         url, 0, false,
                     )
