@@ -37,7 +37,11 @@ data class PartialModrinthProject(
     private val color: Int?,
     private val slug: String,
     @SerializedName("project_type") private val projectType: String,
-    private val id: String,
+    // Modrinth's /v2/search returns this as "project_id" (verified 2026-05-14).
+    // Upstream's lack of @SerializedName here is silently broken on the
+    // current API; the field stays bytecode-named `id` so the rest of the
+    // ported logic doesn't change.
+    @SerializedName("project_id") private val id: String,
 ) : IProject {
     @Transient
     private var projectRequest: CompletableFuture<FullModrinthProject?>? = null

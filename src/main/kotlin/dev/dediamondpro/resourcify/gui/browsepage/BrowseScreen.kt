@@ -20,7 +20,9 @@ package dev.dediamondpro.resourcify.gui.browsepage
 import com.cleanroommc.modularui.api.drawable.IKey
 import com.cleanroommc.modularui.screen.ModularPanel
 import com.cleanroommc.modularui.screen.ModularScreen
+import com.cleanroommc.modularui.api.widget.IWidget
 import com.cleanroommc.modularui.widgets.ButtonWidget
+import com.cleanroommc.modularui.widgets.ListWidget
 import com.cleanroommc.modularui.widgets.TextWidget
 import com.cleanroommc.modularui.widgets.layout.Flow
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget
@@ -32,9 +34,11 @@ import dev.dediamondpro.resourcify.services.ServiceRegistry
 import dev.dediamondpro.resourcify.util.MultiThreading
 import net.minecraft.client.Minecraft
 
-// Concrete ButtonWidget so the F-bounded self-type W extends ButtonWidget<W>
-// is satisfied. ButtonWidget<Nothing>() / ButtonWidget<*>() don't compile.
+// Concrete subclasses so the F-bounded self-types (W extends Self<W>) of
+// MUI2's fluent builders are satisfied. Self<Nothing>() / Self<*>() don't
+// compile in Kotlin.
 private class SimpleButton : ButtonWidget<SimpleButton>()
+private class SimpleList : ListWidget<IWidget, SimpleList>()
 
 // Entire screen state lives in this lambda's closure. See commit message of
 // 8a9f9e5 for why instance fields don't work with MUI2's super-init order.
@@ -43,11 +47,11 @@ class BrowseScreen(type: ProjectType) : ModularScreen(VintageResourcify.MODID, {
     val defaultSortKey = service.getSortOptions().keys.firstOrNull() ?: ""
 
     val searchBox = TextFieldWidget().size(180, 14)
-    val resultsColumn: Flow = Flow.column()
+    val resultsList = SimpleList()
 
     fun runSearch() {
-        resultsColumn.removeAll()
-        resultsColumn.child(TextWidget(IKey.str("Searching...")))
+        resultsList.removeAll()
+        resultsList.child(TextWidget(IKey.str("Searching...")))
         val query = searchBox.text ?: ""
         MultiThreading.supplyAsync {
             try {
@@ -58,14 +62,14 @@ class BrowseScreen(type: ProjectType) : ModularScreen(VintageResourcify.MODID, {
             }
         }.thenAccept { result ->
             Minecraft.getMinecraft().func_152344_a {
-                resultsColumn.removeAll()
+                resultsList.removeAll()
                 val projects: List<IProject> = result?.projects ?: emptyList()
                 if (projects.isEmpty()) {
-                    resultsColumn.child(TextWidget(IKey.str("No results")))
+                    resultsList.child(TextWidget(IKey.str("No results")))
                     return@func_152344_a
                 }
                 projects.take(20).forEach { project ->
-                    resultsColumn.child(
+                    resultsList.child(
                         SimpleButton()
                             .height(14)
                             .widthRel(1f)
@@ -94,11 +98,11 @@ class BrowseScreen(type: ProjectType) : ModularScreen(VintageResourcify.MODID, {
                 .onMousePressed { btn -> if (btn == 0) { runSearch(); true } else false }
         )
 
-    resultsColumn.top(28).left(8).right(8).bottom(8)
+    resultsList.top(28).left(8).right(8).bottom(8)
         .child(TextWidget(IKey.str("Loading...")))
     runSearch()
 
     ModularPanel.defaultPanel("vintage-resourcify-browse", 320, 220)
         .child(topRow)
-        .child(resultsColumn)
+        .child(resultsList)
 })
