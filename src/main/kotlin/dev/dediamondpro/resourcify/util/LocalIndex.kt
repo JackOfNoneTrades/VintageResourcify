@@ -50,7 +50,12 @@ class LocalIndex private constructor(private val folder: File) {
     fun lookupByFile(target: File): Entry? {
         data.entries.firstOrNull { it.fileName == target.name }?.let { return it }
         // Fallback: file may have been renamed manually. Hash-match if we
-        // have a recorded sha1.
+        // have a recorded sha1. Guard against a non-existent file: vanilla
+        // can still hold a list entry for a file that's been deleted
+        // out-of-band (e.g. active pack just deleted by the user), and
+        // calling getSha1 on it would spam FileNotFoundException every
+        // frame.
+        if (!target.exists() || !target.isFile) return null
         val sha = Utils.getSha1(target) ?: return null
         return data.entries.firstOrNull { it.sha1 == sha }
     }

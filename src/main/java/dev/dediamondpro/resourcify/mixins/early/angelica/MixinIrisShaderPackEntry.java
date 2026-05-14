@@ -26,16 +26,24 @@ public class MixinIrisShaderPackEntry {
         java.io.File folder = PackOverlayRenderer.INSTANCE.shaderpacksFolder();
         java.io.File file = PackOverlayRenderer.INSTANCE.shaderPackFile(folder, packName);
         if (file == null) return;
-        String platform = PackOverlayRenderer.INSTANCE.lookupPlatform(folder, file);
-        if (platform == null) return;
+        int cross = 16;
         int badge = 10;
-        // Iris paints the row's label via drawCenteredString(name, ..., y, ..)
-        // which places ~9px-tall text at [y, y+9]. Align the 10px badge to
-        // that text band rather than the full slotHeight, since slot
-        // rendering has internal padding and the visible row is shorter
-        // than the 20px slot.
-        int xRight = x + listWidth - badge - 4;
+        // Always reserve cross-width on the right so badge position stays
+        // stable whether or not the row is hovered.
+        int xCross = x + listWidth - cross - 2;
+        int xBadge = xCross - badge - 4;
         int yMid = y - 1;
-        PackOverlayRenderer.INSTANCE.drawBadge(platform, xRight, yMid, badge, mouseX, mouseY);
+        String platform = PackOverlayRenderer.INSTANCE.lookupPlatform(folder, file);
+        if (platform != null) {
+            PackOverlayRenderer.INSTANCE.drawBadge(platform, xBadge, yMid, badge, mouseX, mouseY);
+        }
+        if (isMouseOver) {
+            // Iris draws the row label at y; the 16px cross visually
+            // centers on the ~9px text band when offset upward by half
+            // the diff.
+            int yCross = y - 4;
+            PackOverlayRenderer.INSTANCE
+                .drawDeleteButton(folder, file, packName, xCross, yCross, cross, mouseX, mouseY);
+        }
     }
 }

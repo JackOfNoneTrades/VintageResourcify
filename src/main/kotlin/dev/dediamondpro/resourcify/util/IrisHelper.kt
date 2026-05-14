@@ -49,6 +49,21 @@ object IrisHelper {
 
     fun isPresent(): Boolean = irisClass != null
 
+    /**
+     * Call `Iris.reload()` reflectively. Returns false on failure so the
+     * caller can fall back to just re-displaying the screen.
+     */
+    fun reload(): Boolean {
+        val cls = irisClass ?: return false
+        return try {
+            cls.getDeclaredMethod("reload").invoke(null)
+            true
+        } catch (e: Throwable) {
+            VintageResourcify.LOG.warn("Iris.reload reflective call failed", e)
+            false
+        }
+    }
+
     /** Reflect Iris ShaderPackScreen's private `parent` field so we can return there after install. */
     fun getShaderScreenParent(screen: GuiScreen): GuiScreen? {
         val cls = shaderScreenClass ?: return null

@@ -28,12 +28,28 @@ public abstract class MixinResourcePackListEntry {
             .func_148318_i();
         java.io.File file = entry.getResourcePackFile();
         if (file == null) return;
-        String platform = PackOverlayRenderer.INSTANCE
-            .lookupPlatform(PackOverlayRenderer.INSTANCE.resourcePacksFolder(), file);
-        if (platform == null) return;
-        int badge = 10;
-        // Vanilla draws the 32x32 pack icon at the row's top-left (x, y).
-        // Anchor the badge to its bottom-right corner.
-        PackOverlayRenderer.INSTANCE.drawBadge(platform, x + 32 - badge, y + 32 - badge, badge, mouseX, mouseY);
+        java.io.File folder = PackOverlayRenderer.INSTANCE.resourcePacksFolder();
+        String platform = PackOverlayRenderer.INSTANCE.lookupPlatform(folder, file);
+        // Badge: only shown for packs we installed (have a platform record).
+        if (platform != null) {
+            int badge = 10;
+            // Vanilla draws the 32x32 pack icon at the row's top-left (x, y).
+            // Anchor the badge to its bottom-right corner.
+            PackOverlayRenderer.INSTANCE.drawBadge(platform, x + 32 - badge, y + 32 - badge, badge, mouseX, mouseY);
+        }
+        // Cross: shown for every pack (tracked or not) while its row is
+        // hovered. We let the user delete any file in the folder, not just
+        // ones we know about.
+        boolean rowHovered = mouseX >= x && mouseX < x + listWidth && mouseY >= y && mouseY < y + slotHeight;
+        if (rowHovered) {
+            int cross = 16;
+            // Bigger right inset so the cross stays clear of the GuiSlot
+            // scrollbar that vanilla paints inside the slot bounds. Row
+            // content sits a couple pixels above the slot center because
+            // vanilla pads the bottom; nudge the cross up to compensate.
+            int cx = x + listWidth - cross - 10;
+            int cy = y + (slotHeight - cross) / 2 - 2;
+            PackOverlayRenderer.INSTANCE.drawDeleteButton(folder, file, file.getName(), cx, cy, cross, mouseX, mouseY);
+        }
     }
 }

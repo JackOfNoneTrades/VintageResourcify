@@ -40,9 +40,40 @@ import java.io.File
 object PackOverlayRenderer {
 
     private const val BADGE_BACKGROUND_ALPHA = 0.55f
+    // cross.png is a 32x16 spritesheet; left 16x16 is unhovered, right is hovered.
+    private val CROSS_TEXTURE = ResourceLocation(VintageResourcify.MODID, "cross.png")
+    private const val CROSS_TEX_WIDTH = 32
+    private const val CROSS_TEX_HEIGHT = 16
+    private const val CROSS_FRAME = 16
 
     private val knownPlatforms = setOf("modrinth", "curseforge", "67", "git")
     private val textures = mutableMapOf<String, ResourceLocation>()
+
+    private data class DeleteRegion(
+        val x1: Int, val y1: Int, val x2: Int, val y2: Int,
+        val folder: File, val file: File, val displayName: String,
+    )
+
+    // Double-buffered to handle Iris's IrisGuiSlot.drawScreen, which pumps
+    // Mouse.next() events recursively *during* drawScreen - before any row
+    // has rendered for this frame. If we cleared and refilled the click-hit
+    // list in one buffer, the mid-frame mouseClicked would see an empty
+    // list every time. Instead, drawDeleteButton appends to [scratch] while
+    // [activeRegions] keeps the previous frame's complete list for clicks
+    // to hit-test against. We swap at end-of-frame.
+    private val activeRegions = mutableListOf<DeleteRegion>()
+    private val scratch = mutableListOf<DeleteRegion>()
+
+    /** Reset the scratch buffer at the start of a frame. [activeRegions] keeps last frame's data. */
+    fun beginFrame() {
+        scratch.clear()
+    }
+
+    /** Swap [scratch] into [activeRegions]. Called at drawScreen TAIL so clicks during the next frame see this frame's data. */
+    fun endFrame() {
+        activeRegions.clear()
+        activeRegions.addAll(scratch)
+    }
 
     private fun textureFor(platform: String): ResourceLocation? {
         val key = when (platform.lowercase()) {
@@ -140,6 +171,135 @@ object PackOverlayRenderer {
         GL11.glColor4f(1f, 1f, 1f, 1f)
         Gui.drawRect(bx, by, bx + boxW, by + boxH, 0xFF000000.toInt())
         fr.drawString(text, bx + pad, by + pad, 0xFFFFFFFF.toInt(), false)
+    }
+
+    /**
+     * Paint the delete button from `cross.png` (32x16 spritesheet: left half
+     * is the rest state, right half is the hover state) and register its
+     * rect for the next click. Caller is expected to only invoke this for
+     * tracked packs and only when the row itself is being hovered.
+     */
+    fun drawDeleteButton(
+        folder: File, file: File, displayName: String,
+        x: Int, y: Int, size: Int,
+        mouseX: Int, mouseY: Int,
+    ) {
+        val hovered = mouseX in x..(x + size) && mouseY in y..(y + size)
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT or GL11.GL_COLOR_BUFFER_BIT or GL11.GL_CURRENT_BIT)
+        try {
+            GL11.glEnable(GL11.GL_TEXTURE_2D)
+            GL11.glEnable(GL11.GL_BLEND)
+            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO)
+            GL11.glColor4f(1f, 1f, 1f, 1f)
+            Minecraft.getMinecraft().textureManager.bindTexture(CROSS_TEXTURE)
+            val uOffset = if (hovered) CROSS_FRAME.toFloat() else 0f
+            Gui.func_152125_a(
+                x, y,
+                uOffset, 0f,
+                CROSS_FRAME, CROSS_TEX_HEIGHT,
+                size, size,
+                CROSS_TEX_WIDTH.toFloat(), CROSS_TEX_HEIGHT.toFloat(),
+            )
+        } finally {
+            GL11.glPopAttrib()
+        }
+        scratch.add(DeleteRegion(x, y, x + size, y + size, folder, file, displayName))
+        if (hovered) {
+            pendingTooltipText = "Delete $displayName"
+            pendingTooltipX = mouseX
+            pendingTooltipY = mouseY
+        }
+    }
+
+    /**
+     * Returns true if the click at [mouseX]/[mouseY] hit one of the rects
+     * recorded by [drawDeleteButton] this frame. Caller cancels the host
+     * screen's normal mouseClicked dispatch when this returns true. On a hit
+     * we hand off to a vanilla [GuiYesNo] dialog; [refresh] is invoked by
+     * the dialog's callback after the user picks Yes or No (with the file
+     * already deleted if they confirmed).
+     */
+    fun handleDeleteClick(mouseX: Int, mouseY: Int, button: Int, refresh: () -> Unit): Boolean {
+        if (button != 0) return false
+        val hit = activeRegions.firstOrNull { mouseX in it.x1..it.x2 && mouseY in it.y1..it.y2 } ?: return false
+        val mc = Minecraft.getMinecraft()
+        val confirm = object : net.minecraft.client.gui.GuiYesNoCallback {
+            override fun confirmClicked(confirmed: Boolean, id: Int) {
+                if (confirmed) performDelete(hit)
+                refresh()
+            }
+        }
+        mc.displayGuiScreen(
+            net.minecraft.client.gui.GuiYesNo(
+                confirm,
+                "Delete '${hit.displayName}'?",
+                "This will remove the file from disk.",
+                0,
+            )
+        )
+        return true
+    }
+
+    private fun performDelete(hit: DeleteRegion) {
+        try {
+            // Drop Forge's open handle for resource packs before deleting.
+            // For shader packs we don't hold an open handle, and the call
+            // simply no-ops.
+            try {
+                dev.dediamondpro.resourcify.platform.Platform.closeResourcePack(hit.file)
+            } catch (_: Throwable) {
+            }
+            // Also remove from the enabled resource-pack list in options.txt
+            // so the refreshed pack screen doesn't try to render a stale
+            // entry pointing at a now-missing file.
+            try {
+                val opts = Minecraft.getMinecraft().gameSettings
+                val name = hit.file.name
+                if (opts.resourcePacks.removeAll { it == name }) {
+                    opts.saveOptions()
+                }
+            } catch (e: Throwable) {
+                VintageResourcify.LOG.warn("Could not drop {} from active resource pack list", hit.file.name, e)
+            }
+            if (hit.file.isDirectory) deleteRecursively(hit.file)
+            else hit.file.delete()
+            LocalIndex.forFolder(hit.folder).remove(hit.file.name)
+            // Drive the same refresh path the host screen's "Done" button
+            // would. Without this, the repository / Iris keeps the deleted
+            // entry loaded and the host re-renders the row.
+            try {
+                val mc = Minecraft.getMinecraft()
+                val shadersFolder = try { IrisHelper.getShaderpacksFolder() } catch (_: Throwable) { null }
+                if (shadersFolder != null && hit.folder.canonicalPath == shadersFolder.canonicalPath) {
+                    // Shader pack delete: ask Iris to reload so the
+                    // currently-applied pack drops if it was the deleted
+                    // one and the available list is rescanned.
+                    IrisHelper.reload()
+                } else {
+                    val repo = mc.resourcePackRepository
+                    val current = ArrayList(repo.repositoryEntries)
+                    val filtered = current.filter { e ->
+                        (e as? dev.dediamondpro.resourcify.mixins.early.minecraft.ResourcePackRepositoryEntryAccessor)
+                            ?.resourcePackFile != hit.file
+                    }
+                    if (filtered.size != current.size) {
+                        repo.func_148527_a(filtered)
+                    }
+                    repo.updateRepositoryEntriesAll()
+                    mc.refreshResources()
+                }
+            } catch (e: Throwable) {
+                VintageResourcify.LOG.warn("Could not refresh resources after delete", e)
+            }
+            VintageResourcify.LOG.info("Deleted pack {} from {}", hit.file.name, hit.folder)
+        } catch (e: Throwable) {
+            VintageResourcify.LOG.warn("Failed to delete {}", hit.file, e)
+        }
+    }
+
+    private fun deleteRecursively(file: File) {
+        if (file.isDirectory) file.listFiles()?.forEach { deleteRecursively(it) }
+        file.delete()
     }
 
     private fun displayName(platform: String): String = when (platform.lowercase()) {
