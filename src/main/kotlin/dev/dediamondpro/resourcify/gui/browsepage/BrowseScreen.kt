@@ -37,6 +37,7 @@ import dev.dediamondpro.resourcify.services.IProject
 import dev.dediamondpro.resourcify.services.ProjectType
 import dev.dediamondpro.resourcify.services.ServiceRegistry
 import dev.dediamondpro.resourcify.util.AsyncIcon
+import dev.dediamondpro.resourcify.util.ClientGuiTasks
 import dev.dediamondpro.resourcify.util.formatCompact
 import dev.dediamondpro.resourcify.util.IrisHelper
 import dev.dediamondpro.resourcify.util.MultiThreading
@@ -497,10 +498,20 @@ private fun buildCard(
                 "BrowseScreen card clicked: {} (id={})",
                 project.getName(), project.getId(),
             )
-            // Defer to next tick: ClientGUI.open immediately calls
-            // displayGuiScreen, which mid-MUI2-event-dispatch leaves the
-            // wrapper in a half-displayed state and never actually paints.
-            Minecraft.getMinecraft().func_152344_a {
+            // ClientGUI.open immediately calls displayGuiScreen. Opening from
+            // inside MUI2's mouse dispatch can leave the new wrapper visible
+            // while ClientScreenHandler.currentScreen is invalidated, so do a
+            // real tick defer instead of Minecraft.func_152344_a (which runs
+            // immediately when already on the client thread).
+            val clickedFrom = Minecraft.getMinecraft().currentScreen
+            ClientGuiTasks.runNextClientTick {
+                if (Minecraft.getMinecraft().currentScreen !== clickedFrom) {
+                    VintageResourcify.LOG.info(
+                        "Skipping stale project open for {} because current screen changed",
+                        project.getId(),
+                    )
+                    return@runNextClientTick
+                }
                 val mcBefore = Minecraft.getMinecraft().currentScreen
                 val muiBefore = try {
                     val cls = Class.forName("com.cleanroommc.modularui.screen.ClientScreenHandler")
