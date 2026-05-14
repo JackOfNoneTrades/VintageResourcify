@@ -43,6 +43,14 @@ import java.io.File
 private class SimpleButton : ButtonWidget<SimpleButton>()
 private class SimpleList : ListWidget<IWidget, SimpleList>()
 
+// Layout constants live here so the column edges line up across the header,
+// summary, body. Values are in GUI-scaled pixels.
+private const val GUTTER = 12
+private const val COL_GAP = 12
+private const val DESC_REL_WIDTH = 0.62f
+private const val VER_REL_WIDTH = 1f - DESC_REL_WIDTH
+private const val DESC_PAD = 8
+
 // See BrowseScreen's commit 8a9f9e5 for why all state lives in the lambda
 // closure rather than in instance fields.
 class ProjectScreen(
@@ -50,8 +58,14 @@ class ProjectScreen(
     packsFolder: File,
     sourceParent: GuiScreen?,
 ) : ModularScreen(VintageResourcify.MODID, { _ ->
+    val themeName = Config.instance.markdownTheme.lowercase()
+    val isLight = themeName == "light"
+    val descBackground = if (isLight) 0xFFF6F8FA.toInt() else 0xFF0D1117.toInt()
+    val rowBackground = if (isLight) 0x10000000 else 0x20FFFFFF
+    val accent = if (isLight) 0xFF1F2328.toInt() else 0xFFF0F6FC.toInt()
+
     val descriptionList = SimpleList()
-        .child(TextWidget(IKey.str("Loading description...")))
+        .child(TextWidget(IKey.str("Loading description...")).color(accent))
     val versionsList = SimpleList()
         .child(TextWidget(IKey.str("Loading versions...")))
 
@@ -67,14 +81,16 @@ class ProjectScreen(
                 }
                 matching.forEach { version: IVersion ->
                     val row = Flow.row()
-                        .height(22).widthRel(1f).margin(0, 0, 0, 3)
+                        .widthRel(1f).height(24).margin(0, 0, 0, 4)
+                        .background(Rectangle().color(rowBackground))
                         .child(
                             TextWidget(IKey.str(version.getName()))
-                                .heightRel(1f).left(4).widthRel(0.62f)
+                                .left(8).widthRel(0.66f).heightRel(1f)
+                                .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
                         )
                         .child(
                             SimpleButton()
-                                .size(56, 16).right(2).top(3)
+                                .size(56, 16).right(6).top(4)
                                 .overlay(IKey.str("Install"))
                                 .onMousePressed { btn ->
                                     if (btn == 0) {
@@ -89,22 +105,29 @@ class ProjectScreen(
         }
     }
 
+    // Compute exact pixel column widths up front. Mixing widthRel for two
+    // siblings against fixed left/right gutters means the columns overlap by
+    // 2*GUTTER pixels (the relatives sum to 100% of parent, but each was
+    // already inset by a gutter). Switching to absolute pixel widths derived
+    // from ScaledResolution sidesteps the issue and lets MarkdownRenderer
+    // wrap to the exact column width.
+    val mc0 = Minecraft.getMinecraft()
+    val sr0 = ScaledResolution(mc0, mc0.displayWidth, mc0.displayHeight)
+    val contentW = sr0.scaledWidth - 2 * GUTTER - COL_GAP
+    val descColW = (contentW * DESC_REL_WIDTH).toInt()
+    val verColW = contentW - descColW
+    val verColLeft = GUTTER + descColW + COL_GAP
+    val descTextW = descColW - DESC_PAD * 2 - 8 // 8 = scrollbar inset
+
     fun loadDescription() {
-        // Compute the actual GUI-scaled pixel width of the description column.
-        // The column is widthRel(0.58) of the panel which is full-screen, with
-        // 10px left padding. Subtract a scrollbar inset (~12px) and a small
-        // safety margin so wrapped text never overlaps the versions column.
-        val mc = Minecraft.getMinecraft()
-        val sr = ScaledResolution(mc, mc.displayWidth, mc.displayHeight)
-        val width = (sr.scaledWidth * 0.58).toInt() - 24
         project.getDescription().thenAccept { rawMd ->
-            mc.func_152344_a {
+            Minecraft.getMinecraft().func_152344_a {
                 descriptionList.removeAll()
                 if (rawMd.isBlank()) {
-                    descriptionList.child(TextWidget(IKey.str("(no description)")))
+                    descriptionList.child(TextWidget(IKey.str("(no description)")).color(accent))
                     return@func_152344_a
                 }
-                MarkdownRenderer.render(rawMd, width).forEach { descriptionList.child(it) }
+                MarkdownRenderer.render(rawMd, descTextW).forEach { descriptionList.child(it) }
             }
         }
     }
@@ -113,30 +136,24 @@ class ProjectScreen(
     loadDescription()
 
     val header = TextWidget(IKey.str(project.getName()).style(EnumChatFormatting.BOLD).scale(1.5f))
-        .top(6).left(10)
+        .top(GUTTER).left(GUTTER)
     val authorLine = TextWidget(IKey.str("by ${project.getAuthor()}").style(EnumChatFormatting.GRAY))
-        .top(22).left(10)
+        .top(GUTTER + 16).left(GUTTER)
     val summary = TextWidget(IKey.str(project.getSummary()))
-        .top(34).left(10).right(10)
+        .top(GUTTER + 28).left(GUTTER).width(descColW)
+        .alignment(com.cleanroommc.modularui.utils.Alignment.TopLeft)
 
-    // Absolute positioning for the two columns. Flow.row was forcing both
-    // children into the same cell, which left description and versions
-    // overlapping. Anchoring left=description / right=versions guarantees
-    // separation regardless of game window size.
-    // Solid color background matching the theme - readme should look like a
-    // GitHub page (white in light, dark gray in dark) rather than the MUI2
-    // panel's textured grey.
-    val descBackground = when (Config.instance.markdownTheme.lowercase()) {
-        "light" -> 0xFFF6F8FA.toInt()
-        else -> 0xFF0D1117.toInt()
-    }
+    val bodyTop = GUTTER + 56
     descriptionList
-        .top(54).left(10).widthRel(0.58f).bottom(10)
+        .top(bodyTop).left(GUTTER).width(descColW).bottom(GUTTER)
         .background(Rectangle().color(descBackground))
+        .padding(DESC_PAD, DESC_PAD, DESC_PAD, DESC_PAD)
+
     val versionsHeader = TextWidget(IKey.str("Versions").style(EnumChatFormatting.BOLD))
-        .top(54).right(10).widthRel(0.38f).height(12)
+        .top(bodyTop).left(verColLeft).width(verColW).height(14)
+        .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
     versionsList
-        .top(70).right(10).widthRel(0.38f).bottom(10)
+        .top(bodyTop + 18).left(verColLeft).width(verColW).bottom(GUTTER)
 
     ModularPanel.defaultPanel("vintage-resourcify-project")
         .full()
@@ -156,19 +173,12 @@ private fun install(version: IVersion, packsFolder: File, sourceParent: GuiScree
     if (!packsFolder.exists()) packsFolder.mkdirs()
     val target = File(packsFolder, version.getFileName())
     VintageResourcify.LOG.info("Installing {} -> {}", url, target)
-    // Release any existing zip handle for this filename so the download can
-    // overwrite (matters on Windows) and so MC drops the cached IResourcePack.
     if (target.exists()) Platform.closeResourcePack(target)
     DownloadManager.download(target, version.getSha1(), url, false) {
         VintageResourcify.LOG.info("Install complete: {}", target.name)
-        // DownloadManager fires the callback off the main thread; bounce to
-        // it before touching Minecraft's resource manager.
         Minecraft.getMinecraft().func_152344_a {
             Platform.reloadResourcePack(target)
             Platform.reloadResources()
-            // Pop back to a freshly-initialized resource pack screen so the
-            // user sees the new pack in the available list without manually
-            // re-navigating Options -> Resource Packs.
             if (sourceParent != null) {
                 Minecraft.getMinecraft().displayGuiScreen(GuiScreenResourcePacks(sourceParent))
             }

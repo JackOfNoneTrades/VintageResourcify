@@ -145,7 +145,13 @@ object MarkdownRenderer {
         }
 
         private fun widget(line: String, color: Int): IWidget {
-            return TextWidget(IKey.str(line).color(color)).widthRel(1f)
+            // TextWidget.draw reads its own .color field and ignores the IKey's
+            // color, so the color must be set on the widget rather than on the
+            // wrapped IKey.
+            return TextWidget(IKey.str(line))
+                .widthRel(1f)
+                .color(color)
+                .alignment(com.cleanroommc.modularui.utils.Alignment.TopLeft)
         }
 
         private fun spacer() {
