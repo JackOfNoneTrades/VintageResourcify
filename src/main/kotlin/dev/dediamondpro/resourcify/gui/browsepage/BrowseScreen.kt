@@ -40,6 +40,7 @@ import dev.dediamondpro.resourcify.util.AsyncIcon
 import dev.dediamondpro.resourcify.util.MultiThreading
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiScreen
+import net.minecraft.client.gui.ScaledResolution
 import net.minecraft.util.EnumChatFormatting
 import org.lwjgl.input.Keyboard
 import java.io.File
@@ -143,10 +144,32 @@ private fun buildCard(
         } else false
     }
     val textLeft = INNER_PAD + ICON_SIZE + 10
-    // Card height is fixed, summary slot fits ~2 lines. Truncate at a char
-    // count generous enough to fill the slot but tight enough to not overflow.
+    // Truncate to two visual lines at the card's actual rendered width.
+    // listFormattedStringToWidth wraps to the column width; if it returns
+    // more than 2 lines, keep the first two and ellipsize the second.
     val rawSummary = project.getSummary()
-    val summary = if (rawSummary.length > 130) rawSummary.take(127) + "..." else rawSummary
+    val mc = Minecraft.getMinecraft()
+    val sr = ScaledResolution(mc, mc.displayWidth, mc.displayHeight)
+    // Panel uses .full(); list has 10px L/R, scrollbar ~12, card uses
+    // INNER_PAD on each side, icon column + 10px gap.
+    val summaryW = sr.scaledWidth - 32 - INNER_PAD * 2 - ICON_SIZE - 10
+    val fr = mc.fontRenderer
+    val summary = if (fr != null) {
+        @Suppress("UNCHECKED_CAST")
+        val wrapped = fr.listFormattedStringToWidth(rawSummary, summaryW.coerceAtLeast(40)) as List<String>
+        if (wrapped.size <= 2) {
+            wrapped.joinToString(" ")
+        } else {
+            val first = wrapped[0]
+            val secondTrimmed = fr.trimStringToWidth(
+                wrapped[1] + " " + wrapped[2],
+                (summaryW - fr.getStringWidth("...")).coerceAtLeast(20),
+            )
+            "$first $secondTrimmed..."
+        }
+    } else {
+        if (rawSummary.length > 130) rawSummary.take(127) + "..." else rawSummary
+    }
     // Vertically center the icon and right-side text column inside the
     // CARD_HEIGHT box. The text column is 36px tall (title 10 + author 9 +
     // summary 17), centered.
