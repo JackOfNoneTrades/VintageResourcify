@@ -26,6 +26,7 @@ import com.cleanroommc.modularui.screen.ModularScreen
 import com.cleanroommc.modularui.widgets.ButtonWidget
 import com.cleanroommc.modularui.widgets.ListWidget
 import com.cleanroommc.modularui.widgets.TextWidget
+import com.cleanroommc.modularui.widget.ParentWidget
 import com.cleanroommc.modularui.widgets.layout.Flow
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget
 import dev.dediamondpro.resourcify.VintageResourcify
@@ -46,6 +47,7 @@ import java.io.File
 // F-bounded self-types in Kotlin need a concrete subclass.
 private class SimpleButton : ButtonWidget<SimpleButton>()
 private class SimpleList : ListWidget<IWidget, SimpleList>()
+private class Container : ParentWidget<Container>()
 
 // Card layout constants. Sized so a 1080p window shows 6-7 cards above the
 // fold and small windows still render readable text.
@@ -141,37 +143,35 @@ private fun buildCard(
         } else false
     }
     val summary = project.getSummary().take(160)
+    val textLeft = INNER_PAD + ICON_SIZE + 10
     // SimpleButton is a SingleChildWidget; multiple .child() calls replace
-    // each other. Wrap card content in a Flow.row so we can hold an icon
-    // alongside a vertically-stacked text column.
-    val textColumn = Flow.column()
-        .left(ICON_SIZE + INNER_PAD).top(0).right(0).heightRel(1f)
+    // each other. Wrap card content in a Container (concrete ParentWidget)
+    // and position children absolutely - Flow's auto-layout was ignoring
+    // padding and stacking children against the edge.
+    val content = Container()
+        .widthRel(1f).heightRel(1f)
+        .child(
+            AsyncIcon(project.getIconUrl(), ICON_SIZE)
+                .top(INNER_PAD).left(INNER_PAD)
+        )
         .child(
             TextWidget(IKey.str(project.getName()).style(EnumChatFormatting.BOLD))
-                .widthRel(1f).height(10)
+                .top(INNER_PAD + 1).left(textLeft).right(INNER_PAD).height(10)
                 .color(textPrimary)
                 .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
         )
         .child(
             TextWidget(IKey.str("by ${project.getAuthor()}"))
-                .widthRel(1f).height(10)
+                .top(INNER_PAD + 12).left(textLeft).right(INNER_PAD).height(9)
                 .color(textSecondary)
                 .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
         )
         .child(
             TextWidget(IKey.str(summary))
-                .widthRel(1f).heightRel(1f)
+                .top(INNER_PAD + 24).left(textLeft).right(INNER_PAD).bottom(INNER_PAD)
                 .color(textPrimary)
                 .alignment(com.cleanroommc.modularui.utils.Alignment.TopLeft)
         )
-
-    val content = Flow.row()
-        .widthRel(1f).heightRel(1f).padding(INNER_PAD, INNER_PAD, INNER_PAD, INNER_PAD)
-        .child(
-            AsyncIcon(project.getIconUrl(), ICON_SIZE)
-                .top(0).left(0)
-        )
-        .child(textColumn)
 
     return SimpleButton()
         .widthRel(1f).height(CARD_HEIGHT).margin(0, 0, 0, CARD_GAP)
