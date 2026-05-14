@@ -17,23 +17,35 @@
 
 package dev.dediamondpro.resourcify.gui.pack
 
+import com.cleanroommc.modularui.factory.ClientGUI
 import dev.dediamondpro.resourcify.VintageResourcify
+import dev.dediamondpro.resourcify.gui.browsepage.BrowseScreen
 import dev.dediamondpro.resourcify.services.ProjectType
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Gui
+import net.minecraft.util.ResourceLocation
+import org.lwjgl.opengl.GL11
 import java.io.File
 
-// Placeholder while task 7 ports the browser screen onto MUI2. The mixin
-// invokes onRender every frame and onMouseClick on every click; here we just
-// draw a marker box at top-right and log clicks inside its bounds, so that
-// task 5 can be verified at runtime without depending on the MUI2 rewrite.
 object PackScreensAddition {
 
     private const val BUTTON_SIZE = 20
+    private const val ICON_SIZE = 16
+    private val PLUS_TEXTURE = ResourceLocation(VintageResourcify.MODID, "plus.png")
 
     fun onRender(type: ProjectType) {
         val (x, y) = buttonOrigin() ?: return
-        Gui.drawRect(x, y, x + BUTTON_SIZE, y + BUTTON_SIZE, 0xFFE91E63.toInt())
+        // Subtle filled background so the button shows up against the gradient.
+        Gui.drawRect(x, y, x + BUTTON_SIZE, y + BUTTON_SIZE, 0x66000000.toInt())
+        val mc = Minecraft.getMinecraft()
+        mc.textureManager.bindTexture(PLUS_TEXTURE)
+        GL11.glColor4f(1f, 1f, 1f, 1f)
+        val iconX = x + (BUTTON_SIZE - ICON_SIZE) / 2
+        val iconY = y + (BUTTON_SIZE - ICON_SIZE) / 2
+        // drawScaledCustomSizeModalRect: x, y, u, v, uWidth, vHeight, drawWidth, drawHeight, texW, texH
+        Gui.func_152125_a(
+            iconX, iconY, 0f, 0f, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE.toFloat(), ICON_SIZE.toFloat()
+        )
     }
 
     fun onMouseClick(mouseX: Int, mouseY: Int, button: Int, type: ProjectType, folder: File) {
@@ -41,17 +53,11 @@ object PackScreensAddition {
         val (x, y) = buttonOrigin() ?: return
         if (mouseX !in x..(x + BUTTON_SIZE)) return
         if (mouseY !in y..(y + BUTTON_SIZE)) return
-        VintageResourcify.LOG.info(
-            "PackScreensAddition click: type={} folder={} (MUI2 browser pending in task 7)",
-            type,
-            folder,
-        )
+        ClientGUI.open(BrowseScreen(type))
     }
 
     private fun buttonOrigin(): Pair<Int, Int>? {
-        val mc = Minecraft.getMinecraft()
-        val screen = mc.currentScreen ?: return null
-        val width = screen.width
-        return (width - BUTTON_SIZE - 4) to 4
+        val screen = Minecraft.getMinecraft().currentScreen ?: return null
+        return (screen.width - BUTTON_SIZE - 4) to 4
     }
 }
