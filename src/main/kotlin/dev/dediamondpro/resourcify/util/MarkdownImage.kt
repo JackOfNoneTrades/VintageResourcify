@@ -76,6 +76,12 @@ class MarkdownImage(private val url: URL, private val maxWidth: Int) : Widget<Ma
             drawW = w
             drawH = h
         }
+        // See AsyncIcon: Gui.func_152125_a doesn't set up textures/blend
+        // itself, so set them up defensively or first-in-frame images render
+        // as solid white quads.
+        GL11.glEnable(GL11.GL_TEXTURE_2D)
+        GL11.glEnable(GL11.GL_BLEND)
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA)
         Minecraft.getMinecraft().textureManager.bindTexture(rl)
         GL11.glColor4f(1f, 1f, 1f, 1f)
         Gui.func_152125_a(0, 0, 0f, 0f, w, h, drawW, drawH, w.toFloat(), h.toFloat())

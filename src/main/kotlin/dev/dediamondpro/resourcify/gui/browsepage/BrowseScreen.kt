@@ -142,33 +142,38 @@ private fun buildCard(
             true
         } else false
     }
-    val summary = project.getSummary().take(160)
     val textLeft = INNER_PAD + ICON_SIZE + 10
-    // SimpleButton is a SingleChildWidget; multiple .child() calls replace
-    // each other. Wrap card content in a Container (concrete ParentWidget)
-    // and position children absolutely - Flow's auto-layout was ignoring
-    // padding and stacking children against the edge.
+    // Card height is fixed, summary slot fits ~2 lines. Truncate at a char
+    // count generous enough to fill the slot but tight enough to not overflow.
+    val rawSummary = project.getSummary()
+    val summary = if (rawSummary.length > 130) rawSummary.take(127) + "..." else rawSummary
+    // Vertically center the icon and right-side text column inside the
+    // CARD_HEIGHT box. The text column is 36px tall (title 10 + author 9 +
+    // summary 17), centered.
+    val iconTop = (CARD_HEIGHT - ICON_SIZE) / 2
+    val textBlockH = 36
+    val textTop = (CARD_HEIGHT - textBlockH) / 2
     val content = Container()
         .widthRel(1f).heightRel(1f)
         .child(
             AsyncIcon(project.getIconUrl(), ICON_SIZE)
-                .top(INNER_PAD).left(INNER_PAD)
+                .top(iconTop).left(INNER_PAD)
         )
         .child(
             TextWidget(IKey.str(project.getName()).style(EnumChatFormatting.BOLD))
-                .top(INNER_PAD + 1).left(textLeft).right(INNER_PAD).height(10)
+                .top(textTop).left(textLeft).right(INNER_PAD).height(10)
                 .color(textPrimary)
                 .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
         )
         .child(
             TextWidget(IKey.str("by ${project.getAuthor()}"))
-                .top(INNER_PAD + 12).left(textLeft).right(INNER_PAD).height(9)
+                .top(textTop + 11).left(textLeft).right(INNER_PAD).height(9)
                 .color(textSecondary)
                 .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
         )
         .child(
             TextWidget(IKey.str(summary))
-                .top(INNER_PAD + 24).left(textLeft).right(INNER_PAD).bottom(INNER_PAD)
+                .top(textTop + 22).left(textLeft).right(INNER_PAD).height(textBlockH - 22)
                 .color(textPrimary)
                 .alignment(com.cleanroommc.modularui.utils.Alignment.TopLeft)
         )

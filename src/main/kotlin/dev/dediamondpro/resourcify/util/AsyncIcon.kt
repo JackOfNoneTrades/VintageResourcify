@@ -52,6 +52,15 @@ class AsyncIcon(private val url: URL?, private val sizePx: Int) : Widget<AsyncIc
         if (url == null || failed) return
         ensureRequested()
         val rl = texture ?: return
+        // Gui.func_152125_a uses Tessellator and inherits the surrounding GL
+        // state. When this is the first draw in a frame's child traversal
+        // (e.g. project header icon as the panel's first child, or the first
+        // image in a SimpleList) GL_TEXTURE_2D / GL_BLEND can still be off
+        // from a prior pass, which renders the textured quad as flat white.
+        // Enable defensively so the icon is independent of draw order.
+        GL11.glEnable(GL11.GL_TEXTURE_2D)
+        GL11.glEnable(GL11.GL_BLEND)
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA)
         Minecraft.getMinecraft().textureManager.bindTexture(rl)
         GL11.glColor4f(1f, 1f, 1f, 1f)
         Gui.func_152125_a(
