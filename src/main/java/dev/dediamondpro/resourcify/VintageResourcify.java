@@ -15,20 +15,17 @@ import cpw.mods.fml.common.event.FMLPreInitializationEvent;
     name = "VintageResourcify",
     acceptedMinecraftVersions = "[1.7.10]",
     acceptableRemoteVersions = "*",
-    customProperties = {
-        @Mod.CustomProperty(k = "license", v = "LGPLv3+SNEED"),
-        @Mod.CustomProperty(k = "issueTrackerUrl", v = "https://github.com/JackOfNoneTrades/VintageResourcify/issues")
-    }
-)
+    customProperties = { @Mod.CustomProperty(k = "license", v = "LGPLv3+SNEED"),
+        @Mod.CustomProperty(
+            k = "issueTrackerUrl",
+            v = "https://github.com/JackOfNoneTrades/VintageResourcify/issues") })
 public class VintageResourcify {
 
     public static final String MODID = "resourcify";
     public static final String MODGROUP = "dev.dediamondpro.resourcify";
     public static final Logger LOG = LogManager.getLogger(MODID);
 
-    @SidedProxy(
-        clientSide = MODGROUP + ".ClientProxy",
-        serverSide = MODGROUP + ".CommonProxy")
+    @SidedProxy(clientSide = MODGROUP + ".ClientProxy", serverSide = MODGROUP + ".CommonProxy")
     public static CommonProxy proxy;
 
     @Mod.EventHandler
