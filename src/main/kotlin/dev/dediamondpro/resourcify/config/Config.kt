@@ -32,6 +32,9 @@ class Config {
     var shaderPacksEnabled: Boolean = true
     var worldsEnabled: Boolean = true
 
+    // "light" or "dark". Used by MarkdownRenderer to pick GitHub-style palette.
+    var markdownTheme: String = "dark"
+
     companion object {
         private val configFile = File("./config/resourcify.json")
         val instance: Config

@@ -20,6 +20,7 @@ package dev.dediamondpro.resourcify.util
 import com.cleanroommc.modularui.api.drawable.IKey
 import com.cleanroommc.modularui.api.widget.IWidget
 import com.cleanroommc.modularui.widgets.TextWidget
+import dev.dediamondpro.resourcify.config.Config
 import net.minecraft.client.Minecraft
 import net.minecraft.util.EnumChatFormatting
 import org.commonmark.node.AbstractVisitor
@@ -47,13 +48,10 @@ import org.commonmark.parser.Parser
 
 /**
  * Parses CommonMark + HTML and emits a vertical stack of [TextWidget]s sized
- * to fit the given column width. Inline styling (bold/italic/code) is mapped
- * onto Minecraft's [EnumChatFormatting] codes. Block-level elements get a
- * trailing blank-line widget so paragraphs separate visually.
- *
- * Markdown rendering is deliberately minimal: no real images, no rich link
- * targets, no nested-list indentation past one level. The goal is to make
- * project descriptions readable, not to be a faithful renderer.
+ * to fit the given column width. Per-block color comes from a [MarkdownTheme]
+ * (light vs dark via Config.instance.markdownTheme); inline run-styling
+ * (bold/italic) still rides on Minecraft `§` codes which the FontRenderer
+ * blends with the base color.
  */
 object MarkdownRenderer {
 
@@ -61,29 +59,27 @@ object MarkdownRenderer {
     private val htmlTag = Regex("<[^>]+>")
 
     fun render(markdown: String, widthPx: Int): List<IWidget> {
-        // commonmark passes raw HTML through as HtmlBlock / HtmlInline. The
-        // pragmatic move is to strip tags up front: we lose the heading-ness
-        // of <h1> etc. but the visible text remains.
         val cleaned = markdown.replace(htmlTag, "")
         val doc = parser.parse(cleaned)
+        val theme = MarkdownThemes.named(Config.instance.markdownTheme)
         val out = mutableListOf<IWidget>()
-        doc.accept(BlockEmitter(out, widthPx))
+        doc.accept(BlockEmitter(out, widthPx, theme))
         return out
     }
 
-    private class BlockEmitter(private val out: MutableList<IWidget>, private val width: Int) : AbstractVisitor() {
+    private class BlockEmitter(
+        private val out: MutableList<IWidget>,
+        private val width: Int,
+        private val theme: MarkdownTheme,
+    ) : AbstractVisitor() {
 
         override fun visit(heading: Heading) {
-            // §e (yellow) for top-level, §6 (gold) for h2, §f (white bold) for h3+.
-            val color = when (heading.level) {
-                1 -> "§e§l"
-                2 -> "§6§l"
-                else -> "§f§l"
-            }
             val text = collectText(heading)
-            emitLines(color + text + "§r")
+            // Mark heading runs bold; size hints encode level visually.
+            val prefix = "§l"
+            emitLines(prefix + text + "§r", theme.heading)
             if (heading.level <= 2) {
-                emitLines("§8" + "-".repeat(60) + "§r")
+                emitLines("-".repeat(80), theme.rule)
             }
             spacer()
         }
@@ -91,7 +87,7 @@ object MarkdownRenderer {
         override fun visit(paragraph: Paragraph) {
             val text = collectText(paragraph)
             if (text.isNotBlank()) {
-                emitLines(text)
+                emitLines(text, theme.text)
                 spacer()
             }
         }
@@ -108,45 +104,48 @@ object MarkdownRenderer {
 
         override fun visit(listItem: ListItem) {
             val text = "  - " + collectText(listItem)
-            emitLines(text)
+            emitLines(text, theme.text)
         }
 
         override fun visit(blockQuote: BlockQuote) {
-            val text = "§7> " + collectText(blockQuote) + "§r"
-            emitLines(text)
+            val text = "> " + collectText(blockQuote)
+            emitLines(text, theme.muted)
             spacer()
         }
 
         override fun visit(fencedCodeBlock: FencedCodeBlock) {
-            fencedCodeBlock.literal.lineSequence().forEach { emitLines("§7" + it + "§r") }
+            fencedCodeBlock.literal.lineSequence().forEach { emitLines(it, theme.code) }
             spacer()
         }
 
         override fun visit(indentedCodeBlock: IndentedCodeBlock) {
-            indentedCodeBlock.literal.lineSequence().forEach { emitLines("§7    " + it + "§r") }
+            indentedCodeBlock.literal.lineSequence().forEach { emitLines("    " + it, theme.code) }
             spacer()
         }
 
         override fun visit(thematicBreak: ThematicBreak) {
-            emitLines("§8" + "-".repeat(40) + "§r")
+            emitLines("-".repeat(80), theme.rule)
             spacer()
         }
 
         override fun visit(htmlBlock: HtmlBlock) {
-            // Tags already stripped at the top-level entry point, but a stray
-            // HtmlBlock can still hold residual whitespace - ignore it.
+            // Tags already stripped at the top-level entry point.
         }
 
-        private fun emitLines(text: String) {
+        private fun emitLines(text: String, color: Int) {
             val fr = Minecraft.getMinecraft().fontRenderer ?: run {
-                out += TextWidget(IKey.str(text)).widthRel(1f)
+                out += widget(text, color)
                 return
             }
             @Suppress("UNCHECKED_CAST")
             val wrapped = fr.listFormattedStringToWidth(text, width) as List<String>
             (if (wrapped.isEmpty()) listOf(text) else wrapped).forEach { line ->
-                out += TextWidget(IKey.str(line)).widthRel(1f)
+                out += widget(line, color)
             }
+        }
+
+        private fun widget(line: String, color: Int): IWidget {
+            return TextWidget(IKey.str(line).color(color)).widthRel(1f)
         }
 
         private fun spacer() {
@@ -170,12 +169,10 @@ object MarkdownRenderer {
             is Text -> sb.append(node.literal)
             is StrongEmphasis -> wrap(node, sb, EnumChatFormatting.BOLD)
             is Emphasis -> wrap(node, sb, EnumChatFormatting.ITALIC)
-            is Code -> {
-                sb.append("§7").append(node.literal).append("§r")
-            }
+            is Code -> sb.append("§o").append(node.literal).append("§r")
             is Link -> {
                 val inner = collectInline(node)
-                sb.append("§9§n").append(inner).append("§r")
+                sb.append("§n").append(inner).append("§r")
             }
             is Image -> {
                 val alt = collectInline(node)
@@ -184,8 +181,6 @@ object MarkdownRenderer {
             is SoftLineBreak, is HardLineBreak -> sb.append(' ')
             is HtmlInline -> { /* tag bodies already stripped */ }
             else -> {
-                // Recurse into unknown inline containers so nested formatting
-                // doesn't get silently dropped.
                 var child = node.firstChild
                 while (child != null) {
                     appendInline(child, sb)

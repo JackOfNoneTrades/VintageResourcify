@@ -15,6 +15,7 @@ import cpw.mods.fml.common.event.FMLPreInitializationEvent;
     name = "VintageResourcify",
     acceptedMinecraftVersions = "[1.7.10]",
     acceptableRemoteVersions = "*",
+    guiFactory = "dev.dediamondpro.resourcify.gui.config.ResourcifyGuiFactory",
     customProperties = { @Mod.CustomProperty(k = "license", v = "LGPLv3+SNEED"),
         @Mod.CustomProperty(
             k = "issueTrackerUrl",

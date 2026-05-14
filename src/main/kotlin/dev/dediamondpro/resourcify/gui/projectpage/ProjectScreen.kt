@@ -114,27 +114,25 @@ class ProjectScreen(
     val summary = TextWidget(IKey.str(project.getSummary()))
         .top(34).left(10).right(10)
 
-    val body = Flow.row()
-        .top(54).left(10).right(10).bottom(10)
-        .child(descriptionList.widthRel(0.6f).heightRel(1f))
-        .child(
-            Flow.column()
-                .left(8).widthRel(0.4f).heightRel(1f).margin(8, 0, 0, 0)
-                .child(
-                    TextWidget(IKey.str("Versions").style(EnumChatFormatting.BOLD))
-                        .height(12).widthRel(1f)
-                )
-                .child(versionsList.widthRel(1f).heightRel(1f))
-        )
+    // Absolute positioning for the two columns. Flow.row was forcing both
+    // children into the same cell, which left description and versions
+    // overlapping. Anchoring left=description / right=versions guarantees
+    // separation regardless of game window size.
+    descriptionList
+        .top(54).left(10).widthRel(0.58f).bottom(10)
+    val versionsHeader = TextWidget(IKey.str("Versions").style(EnumChatFormatting.BOLD))
+        .top(54).right(10).widthRel(0.38f).height(12)
+    versionsList
+        .top(70).right(10).widthRel(0.38f).bottom(10)
 
-    // .full() makes the panel cover the whole game screen instead of using
-    // the default 176x166 dialog box.
     ModularPanel.defaultPanel("vintage-resourcify-project")
         .full()
         .child(header)
         .child(authorLine)
         .child(summary)
-        .child(body)
+        .child(descriptionList)
+        .child(versionsHeader)
+        .child(versionsList)
 })
 
 private fun install(version: IVersion, packsFolder: File, sourceParent: GuiScreen?) {
