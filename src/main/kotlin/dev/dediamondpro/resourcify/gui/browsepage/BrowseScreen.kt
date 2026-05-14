@@ -17,21 +17,60 @@
 
 package dev.dediamondpro.resourcify.gui.browsepage
 
+import com.cleanroommc.modularui.api.drawable.IKey
 import com.cleanroommc.modularui.screen.CustomModularScreen
 import com.cleanroommc.modularui.screen.ModularPanel
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext
 import com.cleanroommc.modularui.widgets.TextWidget
+import com.cleanroommc.modularui.widgets.layout.Flow
 import dev.dediamondpro.resourcify.VintageResourcify
+import dev.dediamondpro.resourcify.platform.Platform
+import dev.dediamondpro.resourcify.services.IProject
+import dev.dediamondpro.resourcify.services.IService
 import dev.dediamondpro.resourcify.services.ProjectType
+import dev.dediamondpro.resourcify.services.ServiceRegistry
+import dev.dediamondpro.resourcify.util.MultiThreading
+import net.minecraft.client.Minecraft
 
-// v1 placeholder browse screen. The real search/grid/filters land in
-// follow-up commits inside this same package.
 class BrowseScreen(private val type: ProjectType) : CustomModularScreen(VintageResourcify.MODID) {
 
+    private val service: IService = ServiceRegistry.getDefaultService(type)
+    private val resultsColumn: Flow = Flow.column().top(20).left(8).right(8).bottom(8)
+
     override fun buildUI(context: ModularGuiContext): ModularPanel {
-        return ModularPanel.defaultPanel("vintage-resourcify-browse", 256, 192)
-            .child(
-                TextWidget("Resourcify $type browser (coming soon)").top(8).left(8)
+        val panel = ModularPanel.defaultPanel("vintage-resourcify-browse", 320, 220)
+            .child(TextWidget(IKey.str("Resourcify $type browser")).top(6).left(8))
+            .child(resultsColumn.child(TextWidget(IKey.str("Loading..."))))
+        runSearch()
+        return panel
+    }
+
+    private fun runSearch() {
+        val defaultSortKey = service.getSortOptions().keys.firstOrNull() ?: ""
+        MultiThreading.supplyAsync {
+            try {
+                service.search("", defaultSortKey, listOf(Platform.getMcVersion()), emptyList(), 0, type)
+            } catch (e: Exception) {
+                VintageResourcify.LOG.warn("Search failed", e)
+                null
+            }
+        }.thenAccept { result ->
+            Minecraft.getMinecraft().func_152344_a {
+                applyResults(result?.projects ?: emptyList())
+            }
+        }
+    }
+
+    private fun applyResults(projects: List<IProject>) {
+        resultsColumn.removeAll()
+        if (projects.isEmpty()) {
+            resultsColumn.child(TextWidget(IKey.str("No results")))
+            return
+        }
+        projects.take(20).forEach { project ->
+            resultsColumn.child(
+                TextWidget(IKey.str("- ${project.getName()} by ${project.getAuthor()}"))
             )
+        }
     }
 }
