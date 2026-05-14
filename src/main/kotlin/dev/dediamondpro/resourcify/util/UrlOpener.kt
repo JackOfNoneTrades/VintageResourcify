@@ -38,12 +38,6 @@ object UrlOpener {
     // all Modrinth + CurseForge links we encounter.
     private val ALLOWED_SCHEMES = setOf("http", "https")
 
-    /**
-     * Open [url] in the user's default browser, wrapped in MC's standard
-     * confirm-link prompt unless the player has disabled it in chat settings.
-     * Returns to [returnTo] (typically the screen that initiated the click)
-     * after the prompt is answered.
-     */
     fun openLinkPrompted(url: String?, returnTo: GuiScreen?) {
         if (url == null) return
         val uri = try {
@@ -58,15 +52,20 @@ object UrlOpener {
             return
         }
         val mc = Minecraft.getMinecraft()
+        VintageResourcify.LOG.info(
+            "UrlOpener.openLinkPrompted url={} chatLinksPrompt={} returnTo={}",
+            url, mc.gameSettings.chatLinksPrompt, returnTo?.javaClass?.simpleName,
+        )
         if (mc.gameSettings.chatLinksPrompt) {
-            // Defer to next tick. Showing GuiConfirmOpenLink synchronously
-            // inside a MUI2 click handler interleaves the modal swap with
-            // MUI2's mouse-state bookkeeping, which surfaces as the dialog
-            // re-popping when the user dismisses it and then presses Escape.
             mc.func_152344_a {
+                VintageResourcify.LOG.info("UrlOpener showing confirm for {}", url)
                 mc.displayGuiScreen(
                     GuiConfirmOpenLink(
-                        { result, _ ->
+                        { result, callbackId ->
+                            VintageResourcify.LOG.info(
+                                "UrlOpener confirm result={} callbackId={} url={}",
+                                result, callbackId, url,
+                            )
                             if (result) openUri(uri)
                             mc.displayGuiScreen(returnTo)
                         },

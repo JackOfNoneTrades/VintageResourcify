@@ -72,6 +72,10 @@ class MarkdownImage(
     override fun onMouseTapped(mouseButton: Int): Interactable.Result {
         if (mouseButton != 0 || linkUrl == null) return Interactable.Result.IGNORE
         val current = Minecraft.getMinecraft().currentScreen
+        VintageResourcify.LOG.info(
+            "MarkdownImage.onMouseTapped button={} url={} currentScreen={}",
+            mouseButton, linkUrl, current?.javaClass?.simpleName,
+        )
         UrlOpener.openLinkPrompted(linkUrl, current)
         return Interactable.Result.SUCCESS
     }
