@@ -249,8 +249,23 @@ object PackScreensAddition {
         }, "Resourcify-PackFilePicker").apply { isDaemon = true }.start()
     }
 
+    fun importPackFile(type: ProjectType, folder: File, source: File) {
+        showToast("Importing ${source.name}...", durationMs = 5_000)
+        Thread({
+            copyPickedPackFile(type, resolveImportFolder(type, folder), source)
+        }, "Resourcify-PackFileImport").apply { isDaemon = true }.start()
+    }
+
     private fun copyPickedPackFile(type: ProjectType, folder: File, source: File) {
         try {
+            if (!source.isFile || !source.canRead()) {
+                showToast("Import failed", durationMs = 5_000)
+                return
+            }
+            if (!source.name.endsWith(".zip", ignoreCase = true)) {
+                showToast("Only zip files are supported", durationMs = 5_000)
+                return
+            }
             if (!folder.exists()) folder.mkdirs()
             val target = File(folder, targetFileName(source.name))
             if (sameFile(source, target)) {

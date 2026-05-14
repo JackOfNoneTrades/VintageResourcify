@@ -5,6 +5,7 @@ import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import dev.dediamondpro.resourcify.config.Config;
+import dev.dediamondpro.resourcify.gui.pack.PackDropHandler;
 import dev.dediamondpro.resourcify.services.ServiceRegistry;
 import dev.dediamondpro.resourcify.util.ClientGuiTasks;
 
@@ -33,6 +34,7 @@ public class ClientProxy extends CommonProxy {
         FMLCommonHandler.instance()
             .bus()
             .register(ClientGuiTasks.INSTANCE);
+        PackDropHandler.INSTANCE.register();
     }
 
     @Override
