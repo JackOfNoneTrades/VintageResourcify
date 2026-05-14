@@ -33,6 +33,10 @@ gradle.allprojects {
     buildscript.repositories.keepFentMavenFirst()
 }
 
+tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>().configureEach {
+    relocate("org.commonmark", "dev.dediamondpro.resourcify.libs.commonmark")
+}
+
 tasks.withType<JavaExec>().configureEach {
     if (name.startsWith("runServer")) {
         doFirst("resourcifyStripClientOnlyMods") {

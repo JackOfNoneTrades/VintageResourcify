@@ -30,6 +30,11 @@ dependencies {
     // FentLib - FentMixins, MixinUtil.Registry, util helpers.
     implementation("org.fentanylsolutions.fentlib:FentLib:087af36-snapshot:dev")
 
+    // commonmark-java - shaded markdown parser for ProjectScreen descriptions.
+    // Relocated to dev.dediamondpro.resourcify.libs.commonmark in addon.gradle.kts
+    // so we don't clash with any other shaded copy in the runtime.
+    shadowImplementation("org.commonmark:commonmark:0.24.0")
+
     // Standard runtime stack (JackModNotes §5).
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:NotEnoughItems:2.8.98-GTNH:dev")
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:GTNHLib:0.9.66:dev")

@@ -30,6 +30,7 @@ import dev.dediamondpro.resourcify.platform.Platform
 import dev.dediamondpro.resourcify.services.IProject
 import dev.dediamondpro.resourcify.services.IVersion
 import dev.dediamondpro.resourcify.util.DownloadManager
+import dev.dediamondpro.resourcify.util.MarkdownRenderer
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiScreen
 import net.minecraft.client.gui.GuiScreenResourcePacks
@@ -91,25 +92,17 @@ class ProjectScreen(
     descriptionList.top(36).left(8).right(8).height(60)
         .child(TextWidget(IKey.str("Loading description...")))
 
-    // Markdown rendering was dropped with MineMark; we strip out formatting
-    // and show the first chunk of the body in a scrollable list of lines.
     fun loadDescription() {
         project.getDescription().thenAccept { rawMd ->
             Minecraft.getMinecraft().func_152344_a {
                 descriptionList.removeAll()
-                val plain = rawMd
-                    .replace(Regex("!\\[[^\\]]*]\\([^)]*\\)"), "")
-                    .replace(Regex("\\[([^\\]]+)]\\([^)]*\\)"), "$1")
-                    .replace(Regex("[`*_>#~]"), "")
-                    .replace(Regex("\n{3,}"), "\n\n")
-                    .trim()
-                if (plain.isEmpty()) {
+                if (rawMd.isBlank()) {
                     descriptionList.child(TextWidget(IKey.str("(no description)")))
                     return@func_152344_a
                 }
-                plain.lineSequence().take(40).forEach { line ->
-                    descriptionList.child(TextWidget(IKey.str(line)).widthRel(1f))
-                }
+                // The panel is 320 wide with 8px L/R margin and the list has
+                // its own scrollbar inset; 290 is a safe content width.
+                MarkdownRenderer.render(rawMd, 290).forEach { descriptionList.child(it) }
             }
         }
     }
