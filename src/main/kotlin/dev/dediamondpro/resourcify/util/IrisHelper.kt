@@ -22,6 +22,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiScreen
 import java.io.File
 import java.nio.file.Path
+import java.util.Optional
 
 /**
  * Soft-dependency reflection bridge to Angelica's Iris shader support. Angelica
@@ -48,6 +49,11 @@ object IrisHelper {
     }
 
     fun isPresent(): Boolean = irisClass != null
+
+    fun isShaderPackScreen(screen: GuiScreen): Boolean {
+        val cls = shaderScreenClass ?: return false
+        return cls.isInstance(screen)
+    }
 
     /**
      * Call `Iris.reload()` reflectively. Returns false on failure so the
@@ -76,6 +82,25 @@ object IrisHelper {
             true
         } catch (e: Throwable) {
             VintageResourcify.LOG.warn("Failed to enable shader pack {}", file.name, e)
+            false
+        }
+    }
+
+    fun isShaderPackEnabled(file: File): Boolean {
+        val cls = irisClass ?: return false
+        return try {
+            val config = cls.getDeclaredMethod("getIrisConfig").invoke(null)
+            val shadersEnabled = config.javaClass.getDeclaredMethod("areShadersEnabled").invoke(config) as? Boolean ?: true
+            if (!shadersEnabled) return false
+            val selected = config.javaClass.getDeclaredMethod("getShaderPackName").invoke(config)
+            val selectedName = when (selected) {
+                is Optional<*> -> selected.orElse(null) as? String
+                is String -> selected
+                else -> null
+            }
+            selectedName == file.name
+        } catch (e: Throwable) {
+            VintageResourcify.LOG.warn("Failed to check shader pack state for {}", file.name, e)
             false
         }
     }

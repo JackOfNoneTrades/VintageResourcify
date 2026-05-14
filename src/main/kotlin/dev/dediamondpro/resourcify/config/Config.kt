@@ -31,6 +31,7 @@ class Config {
     var dataPacksEnabled: Boolean = true
     var shaderPacksEnabled: Boolean = true
     var worldsEnabled: Boolean = true
+    var autoUpdateChecks: Boolean = true
 
     // "light" or "dark". Used by MarkdownRenderer to pick GitHub-style palette.
     var markdownTheme: String = "dark"

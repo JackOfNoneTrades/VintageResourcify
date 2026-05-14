@@ -73,6 +73,39 @@ object Platform {
         }
     }
 
+    fun isResourcePackEnabled(file: File): Boolean {
+        val repo = Minecraft.getMinecraft().resourcePackRepository
+        return repo.repositoryEntries.any { entry ->
+            val pack = entry.resourcePack as? AbstractResourcePack ?: return@any false
+            sameFile((pack as AbstractResourcePackAccessor).resourcePackFile, file)
+        }
+    }
+
+    fun replaceEnabledResourcePack(oldFile: File, newFile: File): Boolean {
+        val mc = Minecraft.getMinecraft()
+        val repo = mc.resourcePackRepository
+        repo.updateRepositoryEntriesAll()
+        val targetEntry = repo.repositoryEntriesAll.firstOrNull { entry ->
+            val pack = entry.resourcePack as? AbstractResourcePack ?: return@firstOrNull false
+            sameFile((pack as AbstractResourcePackAccessor).resourcePackFile, newFile)
+        } ?: return false
+        val selected = repo.repositoryEntries.toMutableList()
+        selected.removeAll { entry ->
+            val pack = entry.resourcePack as? AbstractResourcePack ?: return@removeAll false
+            sameFile((pack as AbstractResourcePackAccessor).resourcePackFile, oldFile)
+        }
+        if (!selected.contains(targetEntry)) {
+            selected.add(targetEntry)
+        }
+        repo.func_148527_a(selected)
+        mc.gameSettings.resourcePacks.clear()
+        selected.forEach { mc.gameSettings.resourcePacks.add(it.resourcePackName) }
+        mc.gameSettings.saveOptions()
+        reloadResourcePack(newFile)
+        reloadResources()
+        return true
+    }
+
     fun enableResourcePack(file: File): Boolean {
         val mc = Minecraft.getMinecraft()
         val repo = mc.resourcePackRepository
@@ -92,5 +125,13 @@ object Platform {
         reloadResourcePack(file)
         reloadResources()
         return true
+    }
+
+    private fun sameFile(a: File, b: File): Boolean {
+        return try {
+            a.canonicalFile == b.canonicalFile
+        } catch (_: Throwable) {
+            a.absoluteFile == b.absoluteFile
+        }
     }
 }

@@ -30,7 +30,9 @@ public class MixinGuiScreenResourcePacks {
             Minecraft.getMinecraft()
                 .getResourcePackRepository()
                 .getDirResourcepacks(),
-            (GuiScreen) (Object) this);
+            (GuiScreen) (Object) this,
+            mouseX,
+            mouseY);
         PackOverlayRenderer.INSTANCE.endFrame();
     }
 
@@ -49,7 +51,7 @@ public class MixinGuiScreenResourcePacks {
             ci.cancel();
             return;
         }
-        PackScreensAddition.INSTANCE.onMouseClick(
+        if (PackScreensAddition.INSTANCE.onMouseClick(
             mouseX,
             mouseY,
             mouseButton,
@@ -57,6 +59,9 @@ public class MixinGuiScreenResourcePacks {
             Minecraft.getMinecraft()
                 .getResourcePackRepository()
                 .getDirResourcepacks(),
-            (GuiScreen) (Object) this);
+            (GuiScreen) (Object) this)) {
+            ci.cancel();
+        }
     }
+
 }

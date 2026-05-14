@@ -71,9 +71,13 @@ object DownloadManager {
         }
         val download = downloadsInProgress.remove(url) ?: return
         download.cancelled.set(true)
-        try {
-            download.stream?.close()
-        } catch (_: Exception) {
+        download.stream?.let { stream ->
+            runAsync {
+                try {
+                    stream.close()
+                } catch (_: Exception) {
+                }
+            }
         }
         download.future?.cancel(true)
         download.file.delete()

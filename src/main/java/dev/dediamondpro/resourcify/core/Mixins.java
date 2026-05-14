@@ -19,6 +19,10 @@ public class Mixins extends FentMixins {
             .side(Side.CLIENT)
             .phase(Phase.EARLY)
             .build();
+        registry.mixin("MixinGuiScreen")
+            .side(Side.CLIENT)
+            .phase(Phase.EARLY)
+            .build();
         registry.mixin("MixinGuiScreenResourcePacks")
             .side(Side.CLIENT)
             .phase(Phase.EARLY)

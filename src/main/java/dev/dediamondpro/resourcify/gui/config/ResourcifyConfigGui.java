@@ -29,6 +29,22 @@ public class ResourcifyConfigGui extends GuiConfig {
     private static List<IConfigElement> buildElements() {
         List<IConfigElement> list = new ArrayList<>();
         list.add(
+            new DummyConfigElement<Boolean>(
+                "autoUpdateChecks",
+                Config.Companion.getInstance()
+                    .getAutoUpdateChecks(),
+                ConfigGuiType.BOOLEAN,
+                "resourcify.config.auto-update-checks") {
+
+                @Override
+                public void set(Boolean value) {
+                    super.set(value);
+                    Config.Companion.getInstance()
+                        .setAutoUpdateChecks(value);
+                    Config.Companion.save(Config.Companion.getInstance());
+                }
+            });
+        list.add(
             new DummyConfigElement<String>(
                 "markdownTheme",
                 Config.Companion.getInstance()

@@ -28,7 +28,7 @@ public class MixinShaderPackScreen {
     @Inject(method = "drawScreen", at = @At("TAIL"), remap = false)
     private void resourcify$drawAddButton(int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
         PackScreensAddition.INSTANCE
-            .onRender(ProjectType.IRIS_SHADER, IrisHelper.INSTANCE.getShaderpacksFolder(), (GuiScreen) (Object) this);
+            .onRender(ProjectType.IRIS_SHADER, IrisHelper.INSTANCE.getShaderpacksFolder(), (GuiScreen) (Object) this, mouseX, mouseY);
         PackOverlayRenderer.INSTANCE.endFrame();
     }
 
@@ -46,12 +46,21 @@ public class MixinShaderPackScreen {
             ci.cancel();
             return;
         }
-        PackScreensAddition.INSTANCE.onMouseClick(
+        if (PackScreensAddition.INSTANCE.onMouseClick(
             mouseX,
             mouseY,
             mouseButton,
             ProjectType.IRIS_SHADER,
             IrisHelper.INSTANCE.getShaderpacksFolder(),
-            self);
+            self)) {
+            ci.cancel();
+        }
+    }
+
+    @Inject(method = "keyTyped", at = @At("HEAD"), cancellable = true, remap = false)
+    private void resourcify$keyTyped(char typedChar, int keyCode, CallbackInfo ci) {
+        if (PackScreensAddition.INSTANCE.onKeyTyped(keyCode)) {
+            ci.cancel();
+        }
     }
 }
