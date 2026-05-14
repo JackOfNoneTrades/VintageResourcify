@@ -19,6 +19,7 @@ package dev.dediamondpro.resourcify.util
 
 import com.cleanroommc.modularui.api.drawable.IKey
 import com.cleanroommc.modularui.api.widget.IWidget
+import com.cleanroommc.modularui.drawable.Rectangle
 import com.cleanroommc.modularui.widgets.TextWidget
 import dev.dediamondpro.resourcify.config.Config
 import net.minecraft.client.Minecraft
@@ -132,7 +133,7 @@ object MarkdownRenderer {
             val prefix = "§l"
             emitLines(prefix + text + "§r", theme.heading)
             if (heading.level <= 2) {
-                emitLines("-".repeat(80), theme.rule)
+                emitRule()
             }
             spacer()
         }
@@ -308,7 +309,7 @@ object MarkdownRenderer {
         }
 
         override fun visit(thematicBreak: ThematicBreak) {
-            emitLines("-".repeat(80), theme.rule)
+            emitRule()
             spacer()
         }
 
@@ -336,6 +337,16 @@ object MarkdownRenderer {
                 .widthRel(1f)
                 .color(color)
                 .alignment(com.cleanroommc.modularui.utils.Alignment.TopLeft)
+        }
+
+        private fun emitRule() {
+            // Use the renderer's measured text budget, not widthRel(1f):
+            // ListWidget/padding/scrollbar layout can make a relative child
+            // wider than the column width used for wrapping.
+            out += TextWidget(IKey.str(""))
+                .width(width.coerceAtLeast(1))
+                .height(1)
+                .background(Rectangle().color(0xFF000000.toInt() or (theme.rule and 0xFFFFFF)))
         }
 
         private fun spacer() {
