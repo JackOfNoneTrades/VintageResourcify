@@ -17,16 +17,16 @@
 
 package dev.dediamondpro.resourcify.platform
 
+import net.minecraft.client.Minecraft
 
-// Methods that touch the resource pack repository (getSelectedResourcePacks,
-// reloadResources, closeResourcePack, enableResourcePack, saveSettings) live
-// in upstream's Platform.kt and depend on AbstractResourcePackAccessor +
-// UMinecraft. They get added back in the MUI2 GUI rewrite (task 7) using the
-// 1.7.10-native ResourcePackRepository APIs and the FentLib-style mixin
-// accessor for AbstractResourcePack.
 object Platform {
+
     // The mod targets exactly one MC version. 1.7.10's ForgeVersion has no
     // mcVersion field, and looking it up at runtime would just yield the same
     // string anyway.
     fun getMcVersion(): String = "1.7.10"
+
+    fun reloadResources() {
+        Minecraft.getMinecraft().refreshResources()
+    }
 }

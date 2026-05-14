@@ -98,5 +98,10 @@ private fun install(version: IVersion, packsFolder: File) {
     VintageResourcify.LOG.info("Installing {} -> {}", url, target)
     DownloadManager.download(target, version.getSha1(), url, false) {
         VintageResourcify.LOG.info("Install complete: {}", target.name)
+        // DownloadManager fires the callback off the main thread; bounce to
+        // it before touching Minecraft's resource manager.
+        Minecraft.getMinecraft().func_152344_a {
+            Platform.reloadResources()
+        }
     }
 }
