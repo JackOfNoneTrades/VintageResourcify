@@ -67,6 +67,12 @@ object MarkdownRenderer {
         """<img\b([^>]*?)/?>""",
         RegexOption.IGNORE_CASE
     )
+    // Match <a href="...">...<img...></a>. DOTALL because anchors often span
+    // multiple lines. Captures: href, then inner content including the img.
+    private val htmlLinkedImg = Regex(
+        """<a\b[^>]*?href\s*=\s*"([^"]*)"[^>]*>([\s\S]*?)</a>""",
+        setOf(RegexOption.IGNORE_CASE)
+    )
     private val attrSrc = Regex("""src\s*=\s*"([^"]*)"""", RegexOption.IGNORE_CASE)
     private val attrAlt = Regex("""alt\s*=\s*"([^"]*)"""", RegexOption.IGNORE_CASE)
 
@@ -80,7 +86,21 @@ object MarkdownRenderer {
         //    from the original markup, and CommonMark treats any line with
         //    4+ leading spaces or a tab as an indented code block (rendered
         //    in `theme.code` red).
-        val withImages = htmlImg.replace(markdown) { m ->
+        // First: <a href=X> ... <img src=Y alt=Z> ... </a>  ->  [![Z](Y)](X)
+        // CommonMark renders that as a Link node wrapping an Image node, which
+        // visit(Paragraph) below picks up so the rendered image becomes
+        // clickable.
+        val withLinkedImages = htmlLinkedImg.replace(markdown) { m ->
+            val href = m.groupValues[1]
+            val inner = m.groupValues[2]
+            val imgMatch = htmlImg.find(inner) ?: return@replace m.value
+            val attrs = imgMatch.groupValues[1]
+            val src = attrSrc.find(attrs)?.groupValues?.getOrNull(1) ?: return@replace ""
+            val alt = attrAlt.find(attrs)?.groupValues?.getOrNull(1) ?: ""
+            "\n\n[![$alt]($src)]($href)\n\n"
+        }
+        // Second: bare <img> outside an anchor -> plain markdown image.
+        val withImages = htmlImg.replace(withLinkedImages) { m ->
             val attrs = m.groupValues[1]
             val src = attrSrc.find(attrs)?.groupValues?.getOrNull(1) ?: return@replace ""
             val alt = attrAlt.find(attrs)?.groupValues?.getOrNull(1) ?: ""
@@ -114,27 +134,36 @@ object MarkdownRenderer {
         }
 
         override fun visit(paragraph: Paragraph) {
-            // If the paragraph contains only image nodes (with maybe whitespace
-            // text between them), emit each as a block-level rendered image.
-            // Common case: Modrinth's banner area is a single paragraph wrapping
-            // one or more <img>/markdown-image references.
-            val images = mutableListOf<Image>()
+            // If the paragraph contains only image nodes (or links wrapping
+            // image nodes), emit each as a block-level rendered image, with
+            // the surrounding link's href attached so clicks open the URL.
+            val imageEntries = mutableListOf<Pair<Image, String?>>()
             var hasNonImage = false
             var child = paragraph.firstChild
             while (child != null) {
                 when (child) {
-                    is Image -> images.add(child)
+                    is Image -> imageEntries.add(child to null)
+                    is Link -> {
+                        // A Link containing exactly one Image (whitespace
+                        // allowed) is the [![alt](src)](href) shape.
+                        val innerImage = sololImage(child)
+                        if (innerImage != null) {
+                            imageEntries.add(innerImage to child.destination)
+                        } else {
+                            hasNonImage = true
+                        }
+                    }
                     is Text -> if (child.literal.isNotBlank()) hasNonImage = true
                     is SoftLineBreak, is HardLineBreak -> {}
                     else -> hasNonImage = true
                 }
                 child = child.next
             }
-            if (images.isNotEmpty() && !hasNonImage) {
-                images.forEach { img ->
+            if (imageEntries.isNotEmpty() && !hasNonImage) {
+                imageEntries.forEach { (img, link) ->
                     val url = try { URL(img.destination) } catch (_: Exception) { null }
                     if (url != null) {
-                        out += MarkdownImage(url, width)
+                        out += MarkdownImage(url, width, link)
                     } else {
                         val alt = collectInline(img)
                         if (alt.isNotEmpty()) emitLines("[$alt]", theme.muted)
@@ -215,6 +244,25 @@ object MarkdownRenderer {
         private fun spacer() {
             out += TextWidget(IKey.str("")).widthRel(1f).height(4)
         }
+    }
+
+    /** Return the single Image child of [link] if its only content is one Image (whitespace allowed). */
+    private fun sololImage(link: Link): Image? {
+        var image: Image? = null
+        var child = link.firstChild
+        while (child != null) {
+            when (child) {
+                is Image -> {
+                    if (image != null) return null
+                    image = child
+                }
+                is Text -> if (child.literal.isNotBlank()) return null
+                is SoftLineBreak, is HardLineBreak -> {}
+                else -> return null
+            }
+            child = child.next
+        }
+        return image
     }
 
     /** Walk inline children of [node] and concatenate text with §-coded styles. */

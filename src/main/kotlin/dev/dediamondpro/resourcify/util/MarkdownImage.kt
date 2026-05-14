@@ -17,6 +17,7 @@
 
 package dev.dediamondpro.resourcify.util
 
+import com.cleanroommc.modularui.api.widget.Interactable
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext
 import com.cleanroommc.modularui.theme.WidgetThemeEntry
 import com.cleanroommc.modularui.widget.Widget
@@ -40,7 +41,11 @@ import java.util.concurrent.atomic.AtomicInteger
  * preserves aspect ratio against the column width. Until then we hold a 32px
  * placeholder so the surrounding ListWidget reserves space.
  */
-class MarkdownImage(private val url: URL, private val maxWidth: Int) : Widget<MarkdownImage>() {
+class MarkdownImage(
+    private val url: URL,
+    private val maxWidth: Int,
+    private val linkUrl: String? = null,
+) : Widget<MarkdownImage>(), Interactable {
 
     private var requested = false
     private var texture: ResourceLocation? = null
@@ -50,6 +55,12 @@ class MarkdownImage(private val url: URL, private val maxWidth: Int) : Widget<Ma
 
     init {
         widthRel(1f)
+    }
+
+    override fun onMousePressed(mouseButton: Int): Interactable.Result {
+        if (mouseButton != 0 || linkUrl == null) return Interactable.Result.IGNORE
+        UrlOpener.openLinkPrompted(linkUrl, Minecraft.getMinecraft().currentScreen)
+        return Interactable.Result.SUCCESS
     }
 
     override fun getDefaultHeight(): Int {
