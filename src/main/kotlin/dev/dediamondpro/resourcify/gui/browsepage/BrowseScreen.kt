@@ -462,14 +462,10 @@ class BrowseScreen(
         .child(packsTab.margin(0, 4, 0, 0))
         .apply { if (shadersAvailable) child(shadersTab) }
 
+    // Search fires automatically on idle via the tick-driven debounce below;
+    // Enter still triggers an immediate search through searchBox's key handler.
     val searchRow = Flow.row().top(28).left(10).right(10).height(16)
-        .child(searchBox.heightRel(1f).widthRel(1f).margin(0, 60, 0, 0))
-        .child(
-            SimpleButton()
-                .size(54, 16).right(0)
-                .overlay(IKey.str("Search"))
-                .onMousePressed { btn -> if (btn == 0) { loadPage(append = false); true } else false }
-        )
+        .child(searchBox.heightRel(1f).widthRel(1f))
 
     triggerSearch = { loadPage(append = false) }
     // Search-as-you-type. Runs on every client tick (~20Hz) via MUI2's per-
