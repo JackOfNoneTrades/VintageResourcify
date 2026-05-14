@@ -92,17 +92,42 @@ object PackScreensAddition {
             autoCheckIfFirstSeen(screen, type, folder)
         }
 
+        val topButtonTooltipEnabled = !(updatePanelOpen && matchesPanel(type, folder))
         val (plusX, plusY) = plusOrigin() ?: return
-        drawIconButton(plusX, plusY, PLUS_TEXTURE, mouseX, mouseY, enabled = true)
+        drawIconButton(
+            plusX,
+            plusY,
+            PLUS_TEXTURE,
+            mouseX,
+            mouseY,
+            enabled = true,
+            tooltip = browseTooltip(type).takeIf { topButtonTooltipEnabled },
+        )
 
         if (supportsPackFilePicking(type)) {
             val (pickX, pickY) = pickOrigin() ?: return
-            drawIconButton(pickX, pickY, PICK_FILE_TEXTURE, mouseX, mouseY, enabled = true)
+            drawIconButton(
+                pickX,
+                pickY,
+                PICK_FILE_TEXTURE,
+                mouseX,
+                mouseY,
+                enabled = true,
+                tooltip = importTooltip(type).takeIf { topButtonTooltipEnabled },
+            )
         }
 
         if (type.hasUpdateButton) {
             val (upX, upY) = updateOrigin() ?: return
-            drawIconButton(upX, upY, UPDATE_TEXTURE, mouseX, mouseY, enabled = true)
+            drawIconButton(
+                upX,
+                upY,
+                UPDATE_TEXTURE,
+                mouseX,
+                mouseY,
+                enabled = true,
+                tooltip = updateTooltip(type, folder).takeIf { topButtonTooltipEnabled },
+            )
             val count = badgeCount(type, folder)
             if (count > 0) {
                 drawUpdateBadge(upX, upY, count)
@@ -499,6 +524,7 @@ object PackScreensAddition {
             mouseX,
             mouseY,
             enabled = buttonEnabled,
+            tooltip = "Update".takeIf { buttonEnabled },
         )
     }
 
@@ -723,6 +749,7 @@ object PackScreensAddition {
         mouseX: Int,
         mouseY: Int,
         enabled: Boolean,
+        tooltip: String? = null,
     ) {
         val hover = enabled && isInside(mouseX, mouseY, x, y, BUTTON_SIZE, BUTTON_SIZE)
         val background = when {
@@ -740,6 +767,9 @@ object PackScreensAddition {
             iconX, iconY, 0f, 0f, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE.toFloat(), ICON_SIZE.toFloat()
         )
         GL11.glColor4f(1f, 1f, 1f, 1f)
+        if (hover && tooltip != null) {
+            PackOverlayRenderer.queueTooltip(tooltip, mouseX, mouseY)
+        }
     }
 
     private fun drawTextButton(x: Int, y: Int, width: Int, height: Int, text: String, enabled: Boolean, hover: Boolean) {
@@ -946,6 +976,26 @@ object PackScreensAddition {
 
     private fun isInside(mouseX: Int, mouseY: Int, x: Int, y: Int, width: Int, height: Int): Boolean {
         return mouseX >= x && mouseY >= y && mouseX < x + width && mouseY < y + height
+    }
+
+    private fun browseTooltip(type: ProjectType): String {
+        return if (isShaderType(type)) "Browse Shaders" else "Browse Resource Packs"
+    }
+
+    private fun importTooltip(type: ProjectType): String {
+        return if (isShaderType(type)) "Import Shader Pack" else "Import Resource Pack"
+    }
+
+    private fun updateTooltip(type: ProjectType, folder: File): String {
+        return when {
+            checkInProgress && matchesPanel(type, folder) -> "Checking Updates"
+            badgeCount(type, folder) > 0 -> "View Updates"
+            else -> "Check Updates"
+        }
+    }
+
+    private fun isShaderType(type: ProjectType): Boolean {
+        return type == ProjectType.IRIS_SHADER || type == ProjectType.OPTIFINE_SHADER
     }
 
     private fun plusOrigin(): Pair<Int, Int>? {

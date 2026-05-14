@@ -145,6 +145,12 @@ object PackOverlayRenderer {
     @Volatile private var pendingTooltipX: Int = 0
     @Volatile private var pendingTooltipY: Int = 0
 
+    fun queueTooltip(text: String, mouseX: Int, mouseY: Int) {
+        pendingTooltipText = text
+        pendingTooltipX = mouseX
+        pendingTooltipY = mouseY
+    }
+
     /**
      * Render and clear the most recently-captured hover tooltip. Called from
      * the pack/shader screen's drawScreen TAIL so the tooltip paints above
