@@ -234,8 +234,65 @@ class BrowseScreen(
         versionDropdownHolder.child(
             TextWidget(IKey.str("§lFilters§r")).color(textPrimary).top(0).left(0).widthRel(1f).height(10)
         )
+
+        // Platform dropdown: same shape as the MC-version one below. Picking
+        // a new platform throws away the current filter state (its categories
+        // and sort keys are platform-specific) and reloads.
         versionDropdownHolder.child(
-            TextWidget(IKey.str("§lMinecraft version§r")).color(textPrimary).top(12).left(0).widthRel(1f).height(10)
+            TextWidget(IKey.str("§lPlatform§r")).color(textPrimary).top(12).left(0).widthRel(1f).height(10)
+        )
+        val availableServices = ServiceRegistry.getServices(currentType)
+        val platformPopup = SimpleList()
+            .top(40).left(0).widthRel(1f).height(availableServices.size * 12 + 4)
+            .background(com.cleanroommc.modularui.drawable.Rectangle().color(0xFF1F2328.toInt()))
+        platformPopup.setEnabled(false)
+        val platformButton = SimpleButton().widthRel(1f).height(14).top(24).left(0)
+        platformButton.overlay(IKey.dynamic { "${service.getName()}  v" })
+        platformButton.onMousePressed { b ->
+            if (b == 0) {
+                platformPopup.setEnabled(!platformPopup.isEnabled)
+                val panel = filtersList.panel
+                if (panel != null && panel.isValid) {
+                    com.cleanroommc.modularui.widget.WidgetTree.resizeInternal(panel.resizer(), false)
+                }
+                true
+            } else false
+        }
+        for (svc in availableServices) {
+            val opt = SimpleButton().widthRel(1f).height(12)
+            opt.overlay(IKey.dynamic {
+                val n = svc.getName()
+                if (svc === service) "§f§l$n§r" else "§7$n§r"
+            })
+            opt.onMousePressed { b ->
+                if (b == 0) {
+                    if (svc !== service) {
+                        service = svc
+                        defaultSortKey = service.getSortOptions().keys.firstOrNull() ?: ""
+                        currentSort = defaultSortKey
+                        selectedCategories.clear()
+                        currentMcVersions = listOf(Platform.getMcVersion())
+                        platformPopup.setEnabled(false)
+                        rebuildFilters()
+                        filtersList.scrollArea.scrollY?.scrollTo(filtersList.scrollArea, 0)
+                        loadPage(append = false)
+                    } else {
+                        platformPopup.setEnabled(false)
+                        val panel = filtersList.panel
+                        if (panel != null && panel.isValid) {
+                            com.cleanroommc.modularui.widget.WidgetTree.resizeInternal(panel.resizer(), false)
+                        }
+                    }
+                    true
+                } else false
+            }
+            platformPopup.child(opt)
+        }
+        versionDropdownHolder.child(platformButton)
+        versionDropdownHolder.child(platformPopup)
+
+        versionDropdownHolder.child(
+            TextWidget(IKey.str("§lMinecraft version§r")).color(textPrimary).top(42).left(0).widthRel(1f).height(10)
         )
 
         // Custom dropdown: a label button + a hidden ListWidget popup. We
@@ -245,12 +302,13 @@ class BrowseScreen(
         // any version list past ~10 entries simply gets clipped. ListWidget
         // does initialise scroll data in onInit, so this popup scrolls.
         val versionPlaceholder = TextWidget(IKey.str("§7Loading versions...§r")).color(textSecondary)
-            .top(24).left(0).widthRel(1f).height(14)
+            .top(54).left(0).widthRel(1f).height(14)
         versionDropdownHolder.child(versionPlaceholder)
         val typeAtVersions = currentType
+        val serviceAtVersions = service
         service.getMinecraftVersions().thenAccept { versions ->
             Minecraft.getMinecraft().func_152344_a {
-                if (typeAtVersions != currentType) return@func_152344_a
+                if (typeAtVersions != currentType || serviceAtVersions !== service) return@func_152344_a
                 val ordered = LinkedHashMap<String, String>()
                 val mcv = Platform.getMcVersion()
                 if (versions.containsKey(mcv)) ordered[mcv] = versions[mcv] ?: mcv
@@ -263,10 +321,10 @@ class BrowseScreen(
                 val preselected = currentMcVersions.firstOrNull()?.takeIf { ordered.containsKey(it) }
                 val selectedId = arrayOf(preselected ?: if (ordered.containsKey(mcv)) mcv else ordered.keys.first())
                 val popup = SimpleList()
-                    .top(40).left(0).widthRel(1f).height(135)
+                    .top(70).left(0).widthRel(1f).height(135)
                     .background(com.cleanroommc.modularui.drawable.Rectangle().color(0xFF1F2328.toInt()))
                 popup.setEnabled(false)
-                val button = SimpleButton().widthRel(1f).height(14).top(24).left(0)
+                val button = SimpleButton().widthRel(1f).height(14).top(54).left(0)
                 button.overlay(IKey.dynamic { "${ordered[selectedId[0]] ?: selectedId[0]}  v" })
                 button.onMousePressed { b ->
                     if (b == 0) {
@@ -299,6 +357,13 @@ class BrowseScreen(
                 versionDropdownHolder.remove(versionPlaceholder)
                 versionDropdownHolder.child(button)
                 versionDropdownHolder.child(popup)
+                // The version button + popup were added after the platform
+                // popup, so they now paint on top of it (last child = topmost).
+                // Pull the platform popup back to the end so its open menu
+                // overlays the version dropdown instead of disappearing behind
+                // it.
+                versionDropdownHolder.remove(platformPopup)
+                versionDropdownHolder.child(platformPopup)
                 val panel = filtersList.panel
                 if (panel != null && panel.isValid) {
                     com.cleanroommc.modularui.widget.WidgetTree.resizeInternal(panel.resizer(), false)
@@ -322,9 +387,10 @@ class BrowseScreen(
         val loadingMarker = TextWidget(IKey.str("§7Loading categories...§r")).color(textSecondary).margin(0, 4, 0, 2)
         filtersList.child(loadingMarker)
         val typeAtRequest = currentType
+        val serviceAtRequest = service
         service.getCategories(currentType).thenAccept { groups ->
             Minecraft.getMinecraft().func_152344_a {
-                if (typeAtRequest != currentType) return@func_152344_a
+                if (typeAtRequest != currentType || serviceAtRequest !== service) return@func_152344_a
                 filtersList.remove(loadingMarker)
                 if (groups.isEmpty()) {
                     filtersList.child(TextWidget(IKey.str("§7(no categories)§r")).color(textSecondary))
@@ -394,8 +460,8 @@ class BrowseScreen(
     // dropdown's open menu paints downward and over the categories list;
     // by keeping it OUTSIDE the scrollable filtersList we avoid scroll-
     // viewport clipping. filtersList starts below it.
-    versionDropdownHolder.top(50).left(10).width(120).height(42)
-    filtersList.top(94).left(10).width(120).bottom(10)
+    versionDropdownHolder.top(50).left(10).width(120).height(72)
+    filtersList.top(124).left(10).width(120).bottom(10)
     resultsList.top(50).left(140).right(10).bottom(10)
         .child(TextWidget(IKey.str("Loading...")).color(textSecondary))
     rebuildFilters()
