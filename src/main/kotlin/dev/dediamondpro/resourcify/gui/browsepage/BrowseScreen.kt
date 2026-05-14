@@ -139,7 +139,16 @@ private fun buildCard(
 ): IWidget {
     val click = { btn: Int ->
         if (btn == 0) {
-            ClientGUI.open(ProjectScreen(project, packsFolder, sourceParent))
+            VintageResourcify.LOG.info(
+                "BrowseScreen card clicked: {} (id={})",
+                project.getName(), project.getId(),
+            )
+            try {
+                ClientGUI.open(ProjectScreen(project, packsFolder, sourceParent))
+                VintageResourcify.LOG.info("ClientGUI.open(ProjectScreen) returned cleanly")
+            } catch (t: Throwable) {
+                VintageResourcify.LOG.error("Opening ProjectScreen threw", t)
+            }
             true
         } else false
     }

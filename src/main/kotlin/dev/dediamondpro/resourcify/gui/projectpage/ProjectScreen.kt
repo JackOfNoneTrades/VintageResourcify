@@ -59,6 +59,7 @@ class ProjectScreen(
     packsFolder: File,
     sourceParent: GuiScreen?,
 ) : ModularScreen(VintageResourcify.MODID, { _ ->
+    VintageResourcify.LOG.info("ProjectScreen lambda entry: project={}", project.getId())
     val themeName = Config.instance.markdownTheme.lowercase()
     val isLight = themeName == "light"
     val descBackground = if (isLight) 0xFFF6F8FA.toInt() else 0xFF0D1117.toInt()
@@ -185,6 +186,7 @@ class ProjectScreen(
     versionsList
         .top(bodyTop + 18).left(verColLeft).width(verColW).bottom(GUTTER)
 
+    VintageResourcify.LOG.info("ProjectScreen lambda exit: building panel")
     ModularPanel.defaultPanel("vintage-resourcify-project")
         .full()
         .child(projectIcon)
