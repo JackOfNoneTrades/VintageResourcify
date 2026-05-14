@@ -69,7 +69,6 @@ class MarkdownParagraph(
     private fun layout(runs: List<Run>): Pair<List<Segment>, Int> {
         val fr = Minecraft.getMinecraft().fontRenderer ?: return emptyList<Segment>() to 12
         val lineHeight = fr.FONT_HEIGHT + 1
-        val spaceWidth = fr.getStringWidth(" ")
         data class Tok(val text: String, val isSpace: Boolean, val styles: String, val color: Int, val linkUrl: String?)
         val toks = mutableListOf<Tok>()
         for (run in runs) {
@@ -87,24 +86,26 @@ class MarkdownParagraph(
         while (i < toks.size) {
             val t = toks[i]
             if (t.isSpace) {
-                if (x > 0) x += spaceWidth
+                if (x > 0) x += widthOf(fr, t.styles, " ")
                 i++
                 continue
             }
-            val pureW = fr.getStringWidth(t.text)
-            if (x + pureW > maxWidth && x > 0) {
+            val renderedText = renderText(t.styles, t.text)
+            val styledW = fr.getStringWidth(renderedText)
+            if (x + styledW > maxWidth && x > 0) {
                 x = 0
                 y += lineHeight
                 continue
             }
-            if (pureW > maxWidth) {
+            if (styledW > maxWidth) {
                 // Long URL etc. - break across lines at character boundaries.
                 var remaining = t.text
                 while (remaining.isNotEmpty()) {
-                    val fit = greedyFit(fr, remaining, maxWidth)
+                    val fit = greedyFit(fr, t.styles, remaining, maxWidth)
                     val chunk = remaining.substring(0, fit)
-                    val w = fr.getStringWidth(chunk)
-                    out.add(Segment(t.styles + chunk, t.color, x, y, w, t.linkUrl))
+                    val renderedChunk = renderText(t.styles, chunk)
+                    val w = fr.getStringWidth(renderedChunk)
+                    out.add(Segment(renderedChunk, t.color, x, y, w, t.linkUrl))
                     remaining = remaining.substring(fit)
                     if (remaining.isNotEmpty()) {
                         x = 0
@@ -116,20 +117,25 @@ class MarkdownParagraph(
                 i++
                 continue
             }
-            out.add(Segment(t.styles + t.text, t.color, x, y, pureW, t.linkUrl))
-            x += pureW
+            out.add(Segment(renderedText, t.color, x, y, styledW, t.linkUrl))
+            x += styledW
             i++
         }
         return out to (y + lineHeight)
     }
 
-    private fun greedyFit(fr: net.minecraft.client.gui.FontRenderer, s: String, maxW: Int): Int {
+    private fun renderText(styles: String, text: String): String = "§r$styles$text§r"
+
+    private fun widthOf(fr: net.minecraft.client.gui.FontRenderer, styles: String, text: String): Int =
+        fr.getStringWidth(renderText(styles, text))
+
+    private fun greedyFit(fr: net.minecraft.client.gui.FontRenderer, styles: String, s: String, maxW: Int): Int {
         var lo = 1
         var hi = s.length
         var best = 1
         while (lo <= hi) {
             val mid = (lo + hi) / 2
-            if (fr.getStringWidth(s.substring(0, mid)) <= maxW) {
+            if (widthOf(fr, styles, s.substring(0, mid)) <= maxW) {
                 best = mid
                 lo = mid + 1
             } else {
