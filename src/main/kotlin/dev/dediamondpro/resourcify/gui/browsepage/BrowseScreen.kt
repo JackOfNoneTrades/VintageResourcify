@@ -21,7 +21,6 @@ import com.cleanroommc.modularui.api.drawable.IKey
 import com.cleanroommc.modularui.api.widget.IWidget
 import com.cleanroommc.modularui.drawable.Rectangle
 import com.cleanroommc.modularui.factory.ClientGUI
-import com.cleanroommc.modularui.screen.GuiScreenWrapper
 import com.cleanroommc.modularui.screen.ModularPanel
 import com.cleanroommc.modularui.screen.ModularScreen
 import com.cleanroommc.modularui.widgets.ButtonWidget
@@ -166,13 +165,12 @@ private fun buildCard(
                 )
                 try {
                     val newScreen = ProjectScreen(project, packsFolder, sourceParent)
-                    // Bypass ClientGUI.open / GuiManager.openScreen and go
-                    // straight through Minecraft.displayGuiScreen. MUI2's
-                    // GuiManager flow has an early-return guard and other
-                    // settings plumbing that may be leaving stale state
-                    // behind after a Project -> Browse -> Project chain.
-                    val wrapper = GuiScreenWrapper(newScreen)
-                    Minecraft.getMinecraft().displayGuiScreen(wrapper)
+                    // Go through MUI2's official entry point so UISettings,
+                    // recipe-viewer integration, etc. get wired up. Calling
+                    // displayGuiScreen on a hand-constructed wrapper skips
+                    // that and crashes on the first mouse press (NEI ghost
+                    // ingredient check reads UISettings).
+                    ClientGUI.open(newScreen)
                     val mcAfter = Minecraft.getMinecraft().currentScreen
                     VintageResourcify.LOG.info(
                         "ClientGUI.open returned cleanly. newProjectScreen={} currentScreen now={}@{}",

@@ -149,9 +149,16 @@ class MarkdownImage(
             // scroll culling to drop the image as soon as its actual painted
             // pixels extend beyond the cached area (i.e. shortly after scroll
             // starts moving it out of view).
-            val root = getPanel()
-            if (root != null) {
-                WidgetTree.resizeInternal(root.resizer(), false)
+            //
+            // Guard against the user navigating away before the image arrives:
+            // touching getPanel().resizer() on a disposed panel corrupts
+            // MUI2's state and breaks subsequent screen swaps. isValid()
+            // returns false once the widget has been removed from its tree.
+            if (isValid()) {
+                val root = getPanel()
+                if (root != null && root.isValid) {
+                    WidgetTree.resizeInternal(root.resizer(), false)
+                }
             }
         } catch (e: Exception) {
             VintageResourcify.LOG.warn("Failed to register texture for {}", url, e)
