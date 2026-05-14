@@ -186,7 +186,10 @@ class ProjectScreen(
     versionsList
         .top(bodyTop + 18).left(verColLeft).width(verColW).bottom(GUTTER)
 
-    VintageResourcify.LOG.info("ProjectScreen lambda exit: building panel")
+    VintageResourcify.LOG.info(
+        "ProjectScreen lambda exit: building panel projectIcon={}",
+        Integer.toHexString(System.identityHashCode(projectIcon)),
+    )
     ModularPanel.defaultPanel("vintage-resourcify-project")
         .full()
         .child(projectIcon)

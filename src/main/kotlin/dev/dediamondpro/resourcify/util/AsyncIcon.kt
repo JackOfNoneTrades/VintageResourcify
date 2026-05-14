@@ -48,7 +48,13 @@ class AsyncIcon(private val url: URL?, private val sizePx: Int) : Widget<AsyncIc
         size(sizePx, sizePx)
     }
 
+    private var loggedFirstDraw = false
+
     override fun draw(context: ModularGuiContext, widgetTheme: WidgetThemeEntry<*>) {
+        if (!loggedFirstDraw) {
+            loggedFirstDraw = true
+            VintageResourcify.LOG.info("AsyncIcon.draw first call url={}", url)
+        }
         if (url == null || failed) return
         ensureRequested()
         val rl = texture ?: return
