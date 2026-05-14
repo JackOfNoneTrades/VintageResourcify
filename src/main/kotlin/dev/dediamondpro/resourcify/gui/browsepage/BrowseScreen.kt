@@ -18,16 +18,18 @@
 package dev.dediamondpro.resourcify.gui.browsepage
 
 import com.cleanroommc.modularui.api.drawable.IKey
+import com.cleanroommc.modularui.api.widget.IWidget
+import com.cleanroommc.modularui.drawable.Rectangle
+import com.cleanroommc.modularui.factory.ClientGUI
 import com.cleanroommc.modularui.screen.ModularPanel
 import com.cleanroommc.modularui.screen.ModularScreen
-import com.cleanroommc.modularui.api.widget.IWidget
 import com.cleanroommc.modularui.widgets.ButtonWidget
 import com.cleanroommc.modularui.widgets.ListWidget
 import com.cleanroommc.modularui.widgets.TextWidget
 import com.cleanroommc.modularui.widgets.layout.Flow
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget
-import com.cleanroommc.modularui.factory.ClientGUI
 import dev.dediamondpro.resourcify.VintageResourcify
+import dev.dediamondpro.resourcify.config.Config
 import dev.dediamondpro.resourcify.gui.projectpage.ProjectScreen
 import dev.dediamondpro.resourcify.platform.Platform
 import dev.dediamondpro.resourcify.services.IProject
@@ -37,17 +39,21 @@ import dev.dediamondpro.resourcify.util.AsyncIcon
 import dev.dediamondpro.resourcify.util.MultiThreading
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiScreen
+import net.minecraft.util.EnumChatFormatting
 import org.lwjgl.input.Keyboard
 import java.io.File
 
-// Concrete subclasses so the F-bounded self-types (W extends Self<W>) of
-// MUI2's fluent builders are satisfied. Self<Nothing>() / Self<*>() don't
-// compile in Kotlin.
+// F-bounded self-types in Kotlin need a concrete subclass.
 private class SimpleButton : ButtonWidget<SimpleButton>()
 private class SimpleList : ListWidget<IWidget, SimpleList>()
 
-// Entire screen state lives in this lambda's closure. See commit message of
-// 8a9f9e5 for why instance fields don't work with MUI2's super-init order.
+// Card layout constants. Sized so a 1080p window shows 6-7 cards above the
+// fold and small windows still render readable text.
+private const val CARD_HEIGHT = 52
+private const val CARD_GAP = 4
+private const val ICON_SIZE = 44
+private const val INNER_PAD = 6
+
 class BrowseScreen(
     type: ProjectType,
     packsFolder: File,
@@ -56,7 +62,11 @@ class BrowseScreen(
     val service = ServiceRegistry.getDefaultService(type)
     val defaultSortKey = service.getSortOptions().keys.firstOrNull() ?: ""
 
-    // Lateinit so the EnterSubmitField below can call runSearch().
+    val isLight = Config.instance.markdownTheme.equals("light", ignoreCase = true)
+    val cardBg = if (isLight) 0x14000000 else 0x28FFFFFF
+    val textPrimary = if (isLight) 0xFF1F2328.toInt() else 0xFFF0F6FC.toInt()
+    val textSecondary = if (isLight) 0xFF59636E.toInt() else 0xFF9198A1.toInt()
+
     var triggerSearch: (() -> Unit)? = null
     val searchBox = object : TextFieldWidget() {
         override fun onKeyPressed(character: Char, keyCode: Int): com.cleanroommc.modularui.api.widget.Interactable.Result {
@@ -66,12 +76,12 @@ class BrowseScreen(
             }
             return super.onKeyPressed(character, keyCode)
         }
-    }.size(180, 14)
+    }
     val resultsList = SimpleList()
 
     fun runSearch() {
         resultsList.removeAll()
-        resultsList.child(TextWidget(IKey.str("Searching...")))
+        resultsList.child(TextWidget(IKey.str("Searching...")).color(textSecondary))
         val query = searchBox.text ?: ""
         MultiThreading.supplyAsync {
             try {
@@ -85,46 +95,28 @@ class BrowseScreen(
                 resultsList.removeAll()
                 val projects: List<IProject> = result?.projects ?: emptyList()
                 if (projects.isEmpty()) {
-                    resultsList.child(TextWidget(IKey.str("No results")))
+                    resultsList.child(TextWidget(IKey.str("No results")).color(textSecondary))
                     return@func_152344_a
                 }
                 projects.take(50).forEach { project ->
-                    val iconSize = 28
-                    val row = Flow.row()
-                        .widthRel(1f).height(32).margin(0, 0, 0, 4)
-                        .child(
-                            AsyncIcon(project.getIconUrl(), iconSize)
-                                .left(4).top(2)
-                        )
-                        .child(
-                            SimpleButton()
-                                .left(iconSize + 10).top(2).right(4).height(28)
-                                .overlay(IKey.str("${project.getName()}  -  by ${project.getAuthor()}"))
-                                .onMousePressed { btn ->
-                                    if (btn == 0) {
-                                        ClientGUI.open(ProjectScreen(project, packsFolder, sourceParent))
-                                        true
-                                    } else false
-                                }
-                        )
-                    resultsList.child(row)
+                    resultsList.child(buildCard(project, packsFolder, sourceParent, cardBg, textPrimary, textSecondary))
                 }
             }
         }
     }
 
-    val topRow = Flow.row().top(6).left(8).height(14)
-        .child(searchBox)
+    val topRow = Flow.row().top(10).left(10).right(10).height(16)
+        .child(searchBox.heightRel(1f).widthRel(1f).margin(0, 60, 0, 0))
         .child(
             SimpleButton()
-                .size(40, 14)
+                .size(54, 16).right(0)
                 .overlay(IKey.str("Search"))
                 .onMousePressed { btn -> if (btn == 0) { runSearch(); true } else false }
         )
 
     triggerSearch = ::runSearch
-    resultsList.top(28).left(8).right(8).bottom(8)
-        .child(TextWidget(IKey.str("Loading...")))
+    resultsList.top(36).left(10).right(10).bottom(10)
+        .child(TextWidget(IKey.str("Loading...")).color(textSecondary))
     runSearch()
 
     ModularPanel.defaultPanel("vintage-resourcify-browse")
@@ -132,3 +124,49 @@ class BrowseScreen(
         .child(topRow)
         .child(resultsList)
 })
+
+/** Project result card: thumbnail + title + author + summary, clickable. */
+private fun buildCard(
+    project: IProject,
+    packsFolder: File,
+    sourceParent: GuiScreen?,
+    cardBg: Int,
+    textPrimary: Int,
+    textSecondary: Int,
+): IWidget {
+    val textLeft = INNER_PAD + ICON_SIZE + INNER_PAD
+    val click = { btn: Int ->
+        if (btn == 0) {
+            ClientGUI.open(ProjectScreen(project, packsFolder, sourceParent))
+            true
+        } else false
+    }
+    val summary = project.getSummary().take(160) // safety cap before wrap
+    return SimpleButton()
+        .widthRel(1f).height(CARD_HEIGHT).margin(0, 0, 0, CARD_GAP)
+        .background(Rectangle().color(cardBg))
+        .overlay() // clear default button label
+        .child(
+            AsyncIcon(project.getIconUrl(), ICON_SIZE)
+                .top(INNER_PAD).left(INNER_PAD)
+        )
+        .child(
+            TextWidget(IKey.str(project.getName()).style(EnumChatFormatting.BOLD))
+                .top(INNER_PAD).left(textLeft).right(INNER_PAD).height(10)
+                .color(textPrimary)
+                .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
+        )
+        .child(
+            TextWidget(IKey.str("by ${project.getAuthor()}"))
+                .top(INNER_PAD + 12).left(textLeft).right(INNER_PAD).height(9)
+                .color(textSecondary)
+                .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
+        )
+        .child(
+            TextWidget(IKey.str(summary))
+                .top(INNER_PAD + 24).left(textLeft).right(INNER_PAD).bottom(INNER_PAD)
+                .color(textPrimary)
+                .alignment(com.cleanroommc.modularui.utils.Alignment.TopLeft)
+        )
+        .onMousePressed(click)
+}
