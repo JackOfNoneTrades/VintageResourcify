@@ -27,11 +27,6 @@ public class Mixins extends FentMixins {
             .side(Side.CLIENT)
             .phase(Phase.EARLY)
             .build();
-        registry.mixin("MixinTextWidget")
-            .modid("modularui2")
-            .side(Side.CLIENT)
-            .phase(Phase.LATE)
-            .build();
     }
 
     public static java.util.List<String> getEarlyMixinsForLoader() {

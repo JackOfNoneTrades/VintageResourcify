@@ -63,12 +63,6 @@ class ProjectScreen(
     val descBackground = if (isLight) 0xFFF6F8FA.toInt() else 0xFF0D1117.toInt()
     val rowBackground = if (isLight) 0x10000000 else 0x20FFFFFF
     val accent = if (isLight) 0xFF1F2328.toInt() else 0xFFF0F6FC.toInt()
-    VintageResourcify.LOG.info(
-        "ProjectScreen theme={} accent=0x{} descBg=0x{}",
-        themeName,
-        Integer.toHexString(accent),
-        Integer.toHexString(descBackground),
-    )
 
     val descriptionList = SimpleList()
         .child(TextWidget(IKey.str("Loading description...")).color(accent))

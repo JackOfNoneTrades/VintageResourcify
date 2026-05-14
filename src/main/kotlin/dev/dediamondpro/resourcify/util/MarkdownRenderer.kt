@@ -59,7 +59,14 @@ object MarkdownRenderer {
     private val htmlTag = Regex("<[^>]+>")
 
     fun render(markdown: String, widthPx: Int): List<IWidget> {
+        // Strip HTML tags first. Then strip leading whitespace on every line
+        // - the HTML strip leaves tabs from the original markup, and
+        // CommonMark interprets any line starting with 4+ spaces or a tab as
+        // an indented code block, so untouched indented HTML becomes a giant
+        // fake code block rendered in `theme.code` (red).
         val cleaned = markdown.replace(htmlTag, "")
+            .lineSequence()
+            .joinToString("\n") { it.trimStart() }
         val doc = parser.parse(cleaned)
         val theme = MarkdownThemes.named(Config.instance.markdownTheme)
         val out = mutableListOf<IWidget>()
