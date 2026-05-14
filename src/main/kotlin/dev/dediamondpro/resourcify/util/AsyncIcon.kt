@@ -62,9 +62,14 @@ class AsyncIcon(private val url: URL?, private val sizePx: Int) : Widget<AsyncIc
     private fun ensureRequested() {
         if (requested || url == null) return
         requested = true
-        VintageResourcify.LOG.info("AsyncIcon request url={} size={}", url, sizePx)
+        // Skip the wsrv.nl resize proxy: it can return a 44x44 image whose
+        // pixel data is empty/transparent for some PNGs (e.g. Faithful 32x's
+        // 256x256 icon), even though the host (cdn.modrinth.com) is already
+        // in the trusted list and the format is ImageIO-readable. Fetching
+        // the original and letting GL handle the downscale is more reliable
+        // and the icons are tiny anyway.
         try {
-            url.getImageAsync(width = sizePx.toFloat()).thenAccept { img ->
+            url.getImageAsync().thenAccept { img ->
                 if (img == null) {
                     VintageResourcify.LOG.warn("AsyncIcon image null for {}", url)
                     failed = true
