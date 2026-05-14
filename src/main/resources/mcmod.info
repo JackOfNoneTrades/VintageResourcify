@@ -3,7 +3,7 @@
 	"modList": [{
 		"modid": "${modId}",
 		"name": "${modName}",
-		"description": "1.7.10 backport of DeDiamondPro's Resourcify — in-game resource pack browser for Modrinth and CurseForge.",
+		"description": "1.7.10 backport of DeDiamondPro's Resourcify - in-game resource pack browser for Modrinth and CurseForge.",
 		"version": "${modVersion}",
 		"mcversion": "${minecraftVersion}",
 		"url": "https://github.com/JackOfNoneTrades/VintageResourcify",

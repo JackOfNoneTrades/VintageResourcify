@@ -15,7 +15,6 @@ import cpw.mods.fml.common.event.FMLPreInitializationEvent;
     name = "VintageResourcify",
     acceptedMinecraftVersions = "[1.7.10]",
     acceptableRemoteVersions = "*",
-    clientSideOnly = true,
     customProperties = {
         @Mod.CustomProperty(k = "license", v = "LGPLv3+SNEED"),
         @Mod.CustomProperty(k = "issueTrackerUrl", v = "https://github.com/JackOfNoneTrades/VintageResourcify/issues")

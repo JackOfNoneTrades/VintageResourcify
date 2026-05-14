@@ -11,7 +11,7 @@ public class Mixins extends FentMixins {
     protected void registerMixins(MixinUtil.Registry registry) {
         // Mixins get registered here during task #5. The skeleton intentionally
         // leaves this empty so the three mixin configs (early/mid/late) stay
-        // valid with no entries — see JackModNotes §4: "keep the file so the
+        // valid with no entries - see JackModNotes §4: "keep the file so the
         // project shape stays uniform" even when a phase has zero mixins.
     }
 
