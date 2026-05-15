@@ -20,12 +20,12 @@ import dev.dediamondpro.resourcify.util.IrisHelper;
 @Mixin(targets = "net.coderbot.iris.gui.screen.ShaderPackScreen")
 public class MixinShaderPackScreen {
 
-    @Inject(method = "drawScreen", at = @At("HEAD"), remap = false)
+    @Inject(method = "drawScreen", at = @At("HEAD"))
     private void resourcify$resetDeleteRegions(int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
         PackOverlayRenderer.INSTANCE.beginFrame();
     }
 
-    @Inject(method = "drawScreen", at = @At("TAIL"), remap = false)
+    @Inject(method = "drawScreen", at = @At("TAIL"))
     private void resourcify$drawAddButton(int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
         PackScreensAddition.INSTANCE.onRender(
             ProjectType.IRIS_SHADER,
@@ -36,7 +36,7 @@ public class MixinShaderPackScreen {
         PackOverlayRenderer.INSTANCE.endFrame();
     }
 
-    @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true, remap = false)
+    @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
     private void resourcify$clickAddOrDelete(int mouseX, int mouseY, int mouseButton, CallbackInfo ci) {
         GuiScreen self = (GuiScreen) (Object) this;
         GuiScreen shaderParent = IrisHelper.INSTANCE.getShaderScreenParent(self);
@@ -61,7 +61,7 @@ public class MixinShaderPackScreen {
         }
     }
 
-    @Inject(method = "keyTyped", at = @At("HEAD"), cancellable = true, remap = false)
+    @Inject(method = "keyTyped", at = @At("HEAD"), cancellable = true)
     private void resourcify$keyTyped(char typedChar, int keyCode, CallbackInfo ci) {
         if (PackScreensAddition.INSTANCE.onKeyTyped(keyCode)) {
             ci.cancel();
