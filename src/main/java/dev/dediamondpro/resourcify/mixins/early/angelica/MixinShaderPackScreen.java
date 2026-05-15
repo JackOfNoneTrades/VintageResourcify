@@ -27,8 +27,12 @@ public class MixinShaderPackScreen {
 
     @Inject(method = "drawScreen", at = @At("TAIL"), remap = false)
     private void resourcify$drawAddButton(int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
-        PackScreensAddition.INSTANCE
-            .onRender(ProjectType.IRIS_SHADER, IrisHelper.INSTANCE.getShaderpacksFolder(), (GuiScreen) (Object) this, mouseX, mouseY);
+        PackScreensAddition.INSTANCE.onRender(
+            ProjectType.IRIS_SHADER,
+            IrisHelper.INSTANCE.getShaderpacksFolder(),
+            (GuiScreen) (Object) this,
+            mouseX,
+            mouseY);
         PackOverlayRenderer.INSTANCE.endFrame();
     }
 
