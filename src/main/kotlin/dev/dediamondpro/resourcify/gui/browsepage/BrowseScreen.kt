@@ -616,6 +616,13 @@ private fun buildCard(
         fr.trimStringToWidth("§l$rawTitle", (summaryW - fr.getStringWidth("...")).coerceAtLeast(20))
             .removePrefix("§l") + "..."
     } else rawTitle
+    // Author + downloads: same hard single-line treatment as the title. The
+    // raw string carries §-codes for the bullet, but trimStringToWidth measures
+    // them transparently, so feed the formatted string in directly.
+    val rawAuthor = "by ${project.getAuthor()}  §8•§r  ${project.getDownloads().formatCompact()} downloads"
+    val authorLine = if (fr != null && fr.getStringWidth(rawAuthor) > summaryW) {
+        fr.trimStringToWidth(rawAuthor, (summaryW - fr.getStringWidth("...")).coerceAtLeast(20)) + "..."
+    } else rawAuthor
     // Vertically center the icon and right-side text column inside the
     // CARD_HEIGHT box. The text column is 36px tall (title 10 + author 9 +
     // summary 17), centered.
@@ -635,7 +642,7 @@ private fun buildCard(
                 .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
         )
         .child(
-            TextWidget(IKey.str("by ${project.getAuthor()}  §8•§r  ${project.getDownloads().formatCompact()} downloads"))
+            TextWidget(IKey.str(authorLine))
                 .top(textTop + 11).left(textLeft).right(INNER_PAD).height(9)
                 .color(textSecondary)
                 .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
