@@ -8,6 +8,7 @@ import cpw.mods.fml.common.SidedProxy;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
+import dev.dediamondpro.resourcify.config.Config;
 
 @Mod(
     modid = VintageResourcify.MODID,
@@ -26,12 +27,22 @@ public class VintageResourcify {
     public static final String MODGROUP = "dev.dediamondpro.resourcify";
     public static final Logger LOG = LogManager.getLogger(MODID);
 
+    private static boolean DEBUG_MODE;
+
     @SidedProxy(clientSide = MODGROUP + ".ClientProxy", serverSide = MODGROUP + ".CommonProxy")
     public static CommonProxy proxy;
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
+        String debugVar = System.getenv("MCMODDING_DEBUG_MODE");
+        DEBUG_MODE = debugVar != null;
+        VintageResourcify.LOG.info("MCMODDING_DEBUG_MODE env var: {}", DEBUG_MODE);
         proxy.preInit(event);
+        VintageResourcify.LOG.info(
+            "debugMode config option: {}",
+            Config.Companion.getInstance()
+                .getDebugMode());
+        VintageResourcify.LOG.info("isDebugMode: {}", isDebugMode());
     }
 
     @Mod.EventHandler
@@ -42,5 +53,16 @@ public class VintageResourcify {
     @Mod.EventHandler
     public void postInit(FMLPostInitializationEvent event) {
         proxy.postInit(event);
+    }
+
+    public static boolean isDebugMode() {
+        return DEBUG_MODE || Config.Companion.getInstance()
+            .getDebugMode();
+    }
+
+    public static void debug(String message) {
+        if (isDebugMode()) {
+            LOG.info("DEBUG: {}", message);
+        }
     }
 }

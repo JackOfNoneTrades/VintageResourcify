@@ -30,6 +30,22 @@ public class ResourcifyConfigGui extends GuiConfig {
         List<IConfigElement> list = new ArrayList<>();
         list.add(
             new DummyConfigElement<Boolean>(
+                "debugMode",
+                Config.Companion.getInstance()
+                    .getDebugMode(),
+                ConfigGuiType.BOOLEAN,
+                "resourcify.config.debug-mode") {
+
+                @Override
+                public void set(Boolean value) {
+                    super.set(value);
+                    Config.Companion.getInstance()
+                        .setDebugMode(value);
+                    Config.Companion.save(Config.Companion.getInstance());
+                }
+            });
+        list.add(
+            new DummyConfigElement<Boolean>(
                 "autoUpdateChecks",
                 Config.Companion.getInstance()
                     .getAutoUpdateChecks(),

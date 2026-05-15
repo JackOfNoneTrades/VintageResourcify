@@ -25,6 +25,7 @@ import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 
 class Config {
+    var debugMode: Boolean = false
     var defaultService: String = ModrinthService.getName()
     var fullResThumbnail: Boolean = false
     var openLinkInResourcify: Boolean = true

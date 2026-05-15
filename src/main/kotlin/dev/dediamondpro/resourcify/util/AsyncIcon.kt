@@ -53,7 +53,7 @@ class AsyncIcon(private val url: URL?, private val sizePx: Int) : Widget<AsyncIc
     override fun draw(context: ModularGuiContext, widgetTheme: WidgetThemeEntry<*>) {
         if (!loggedFirstDraw) {
             loggedFirstDraw = true
-            VintageResourcify.LOG.info("AsyncIcon.draw first call url={}", url)
+            VintageResourcify.debug("AsyncIcon.draw first call url=$url")
         }
         if (url == null || failed) return
         ensureRequested()
@@ -90,9 +90,7 @@ class AsyncIcon(private val url: URL?, private val sizePx: Int) : Widget<AsyncIc
                     failed = true
                     return@thenAccept
                 }
-                VintageResourcify.LOG.info(
-                    "AsyncIcon got image {}x{} for {}", img.width, img.height, url,
-                )
+                VintageResourcify.debug("AsyncIcon got image ${img.width}x${img.height} for $url")
                 Minecraft.getMinecraft()
                     .func_152344_a { adoptImage(img) }
             }
