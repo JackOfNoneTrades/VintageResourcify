@@ -22,7 +22,7 @@
 * Drag and drop resource packs and shaders onto their respective screens ([lwjgl3ify](github.com/GTNewHorizons/lwjgl3ify) required)
 * Support for adding third party Modrinth instances
 
-Only the Angelica GUI is supported as of now (but you can still download shaders from the resource packs gui).
+Vintage Resourcify supports Angelica [![curse](images/icons/curse.png)](https://www.curseforge.com/minecraft/mc-mods/angelica)  [![modrinth](images/icons/modrinth.png)](https://modrinth.com/mod/angelica/versions) [![git](images/icons/git.png)](https://github.com/GTNewHorizons/Angelica) and Swansong [![curse](images/icons/curse.png)](https://www.curseforge.com/minecraft/mc-mods/swansong)  [![modrinth](images/icons/modrinth.png)](https://modrinth.com/mod/swansong) [![git](images/icons/git.png)](https://github.com/vfx-dev/SwanSong). 
 
 ![logo](images/screenshots/search.png)
 
