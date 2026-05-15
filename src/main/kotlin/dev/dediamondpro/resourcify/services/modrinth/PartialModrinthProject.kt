@@ -53,6 +53,16 @@ data class PartialModrinthProject(
     @Transient
     private var versionsRequest: CompletableFuture<List<ModrinthVersion>>? = null
 
+    @Transient
+    private var service: ModrinthApiService? = null
+
+    internal fun bindService(service: ModrinthApiService): PartialModrinthProject {
+        this.service = service
+        return this
+    }
+
+    private fun service(): ModrinthApiService = service ?: ModrinthService
+
     override fun getName(): String = title
     override fun getId(): String = id
     override fun getSummary(): String = summary
@@ -64,7 +74,7 @@ data class PartialModrinthProject(
     override fun getDescription(): CompletableFuture<String> =
         fetchProject().thenApply { it?.getDescription()?.getNow(null) ?: error("Failed to fetch description.") }
 
-    override fun getBrowserUrl(): String = "https://modrinth.com/$projectType/$slug"
+    override fun getBrowserUrl(): String = "${service().browserBaseUrl}/$projectType/$slug"
     override fun getCategories(): CompletableFuture<List<String>> =
         fetchProject().thenApply {
             it?.getCategories()?.getNow(null) ?: error("Failed to fetch categories.")
@@ -76,7 +86,7 @@ data class PartialModrinthProject(
 
     private fun fetchProject(): CompletableFuture<FullModrinthProject?> {
         return projectRequest ?: supplyAsync {
-            URL("${ModrinthService.API}/project/$slug").getJson<FullModrinthProject>()
+            URL("${service().apiUrl}/project/$slug").getJson<FullModrinthProject>()?.bindService(service())
         }.apply { projectRequest = this }
     }
 
@@ -92,7 +102,7 @@ data class PartialModrinthProject(
 
     override fun getVersions(): CompletableFuture<List<IVersion>> {
         return (versionsRequest ?: supplyAsync {
-            URL("${ModrinthService.API}/project/$slug/version").getJson<List<ModrinthVersion>>()
+            URL("${service().apiUrl}/project/$slug/version").getJson<List<ModrinthVersion>>()
                 ?.filter { it.hasFile() }
                 // Filter mods (jar files) out of datapack versions
                 ?.filter { projectType != "mod" || it.getLoaders().contains("datapack") }
@@ -102,7 +112,7 @@ data class PartialModrinthProject(
 
     private fun fetchMembers(): CompletableFuture<List<Member>?> {
         return membersRequest ?: supplyAsync {
-            URL("${ModrinthService.API}/project/$slug/members").getJson<List<Member>>()
+            URL("${service().apiUrl}/project/$slug/members").getJson<List<Member>>()
         }.apply { membersRequest = this }
     }
 

@@ -17,16 +17,21 @@
 
 package dev.dediamondpro.resourcify.services
 
+import dev.dediamondpro.resourcify.VintageResourcify
 import dev.dediamondpro.resourcify.config.Config
+import dev.dediamondpro.resourcify.config.ConfiguredPlatforms
 import dev.dediamondpro.resourcify.services.curseforge.CurseForgeService
+import dev.dediamondpro.resourcify.services.modrinth.ModrinthApiService
 import dev.dediamondpro.resourcify.services.modrinth.ModrinthService
 
 object ServiceRegistry {
     private val services = mutableListOf<IService>()
+    private val configuredServices = mutableListOf<IService>()
 
     init {
         registerService(ModrinthService)
         registerService(CurseForgeService)
+        loadConfiguredServices()
     }
 
     fun getAllServices(): List<IService> {
@@ -47,5 +52,30 @@ object ServiceRegistry {
 
     fun registerService(service: IService) {
         services.add(service)
+    }
+
+    fun loadConfiguredServices() {
+        services.removeAll(configuredServices)
+        configuredServices.clear()
+        val platforms = ConfiguredPlatforms.load()
+        for (platform in ConfiguredPlatforms.enabledPlatforms()) {
+            val platformId = ConfiguredPlatforms.platformId(platform.name)
+            if (services.any { it.getPlatformId() == platformId }) {
+                VintageResourcify.LOG.warn("Skipping configured platform {} because platform id {} is already registered", platform.name, platformId)
+                continue
+            }
+            val service = ModrinthApiService(
+                platform.name,
+                ConfiguredPlatforms.normalizedApiUrl(platform.apiUrl),
+                ConfiguredPlatforms.browserBaseUrl(platform.apiUrl),
+                platformId,
+            )
+            configuredServices.add(service)
+            registerService(service)
+        }
+        VintageResourcify.LOG.info(
+            "Loaded {} configured platform(s) from platforms.json",
+            platforms.count { it.enabled != false && it.name.isNotBlank() && it.apiUrl.isNotBlank() },
+        )
     }
 }

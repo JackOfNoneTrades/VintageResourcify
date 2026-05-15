@@ -18,24 +18,26 @@
 package dev.dediamondpro.resourcify.gui.pack
 
 import dev.dediamondpro.resourcify.VintageResourcify
+import dev.dediamondpro.resourcify.config.ConfiguredPlatforms
 import dev.dediamondpro.resourcify.util.IrisHelper
 import dev.dediamondpro.resourcify.util.LocalIndex
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Gui
 import net.minecraft.client.renderer.OpenGlHelper
 import net.minecraft.client.renderer.Tessellator
+import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.util.ResourceLocation
 import org.lwjgl.opengl.GL11
 import java.io.File
+import javax.imageio.ImageIO
 
 /**
  * Draws the small "source: <platform>" badge over a pack entry's icon area,
  * sourced from the local install index. Pack files we did not install (and
  * thus have no index entry for) get no badge.
  *
- * Platform icons live under `assets/resourcify/platform/<id>.png`. The legacy
- * `67.png` is included so support for 67minecraft (or whatever lands later)
- * doesn't need an additional asset drop later.
+ * Built-in platform icons live under `assets/resourcify/platform/<id>.png`.
+ * Configured platform icons are loaded from config/vintageresourcify/icons.
  */
 object PackOverlayRenderer {
 
@@ -46,8 +48,9 @@ object PackOverlayRenderer {
     private const val CROSS_TEX_HEIGHT = 16
     private const val CROSS_FRAME = 16
 
-    private val knownPlatforms = setOf("modrinth", "curseforge", "67", "git")
-    private val textures = mutableMapOf<String, ResourceLocation>()
+    private data class PlatformTexture(val location: ResourceLocation, val width: Int, val height: Int)
+
+    private val textures = mutableMapOf<String, PlatformTexture>()
 
     private data class DeleteRegion(
         val x1: Int, val y1: Int, val x2: Int, val y2: Int,
@@ -75,15 +78,37 @@ object PackOverlayRenderer {
         activeRegions.addAll(scratch)
     }
 
-    private fun textureFor(platform: String): ResourceLocation? {
+    private fun textureFor(platform: String): PlatformTexture? {
         val key = when (platform.lowercase()) {
             "curse", "curseforge" -> "curse"
             "modrinth" -> "modrinth"
             "67minecraft", "67" -> "67"
             "git", "github" -> "git"
-            else -> null
-        } ?: return null
-        return textures.getOrPut(key) { ResourceLocation(VintageResourcify.MODID, "platform/$key.png") }
+            else -> platform.lowercase()
+        }
+        return textures.getOrPut(key) {
+            if (key in setOf("curse", "modrinth", "67", "git")) {
+                PlatformTexture(ResourceLocation(VintageResourcify.MODID, "platform/$key.png"), 16, 16)
+            } else {
+                loadConfiguredIcon(key) ?: return null
+            }
+        }
+    }
+
+    private fun loadConfiguredIcon(platformId: String): PlatformTexture? {
+        val file = ConfiguredPlatforms.iconFile(platformId) ?: return null
+        if (!file.isFile) return null
+        return try {
+            val image = ImageIO.read(file) ?: return null
+            val texture = Minecraft.getMinecraft().textureManager.getDynamicTextureLocation(
+                "vresourcify_platform_$platformId",
+                DynamicTexture(image),
+            )
+            PlatformTexture(texture, image.width, image.height)
+        } catch (t: Throwable) {
+            VintageResourcify.LOG.warn("Could not load platform icon {}", file, t)
+            null
+        }
     }
 
     fun lookupPlatform(folder: File, file: File): String? =
@@ -128,8 +153,19 @@ object PackOverlayRenderer {
             GL11.glEnable(GL11.GL_BLEND)
             OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO)
             GL11.glColor4f(1f, 1f, 1f, 1f)
-            Minecraft.getMinecraft().textureManager.bindTexture(tex)
-            Gui.func_152125_a(x, y, 0f, 0f, size, size, size, size, size.toFloat(), size.toFloat())
+            Minecraft.getMinecraft().textureManager.bindTexture(tex.location)
+            Gui.func_152125_a(
+                x,
+                y,
+                0f,
+                0f,
+                tex.width,
+                tex.height,
+                size,
+                size,
+                tex.width.toFloat(),
+                tex.height.toFloat(),
+            )
         } finally {
             GL11.glPopAttrib()
         }
@@ -313,7 +349,7 @@ object PackOverlayRenderer {
         "modrinth" -> "Modrinth"
         "67minecraft", "67" -> "67Minecraft"
         "git", "github" -> "GitHub"
-        else -> platform.replaceFirstChar { it.uppercase() }
+        else -> ConfiguredPlatforms.displayName(platform) ?: platform.replaceFirstChar { it.uppercase() }
     }
 
     private fun addQuad(t: Tessellator, left: Int, top: Int, right: Int, bottom: Int) {

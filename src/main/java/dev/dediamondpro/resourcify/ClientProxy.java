@@ -16,8 +16,8 @@ public class ClientProxy extends CommonProxy {
         super.preInit(event);
 
         // Touching Config.Companion.getInstance() runs the companion's init block,
-        // which reads config/resourcify.json (or writes defaults if missing).
-        // ServiceRegistry's static init registers Modrinth + CurseForge services.
+        // which reads config/vintageresourcify/resourcify.json (or writes defaults if missing).
+        // ServiceRegistry's static init registers built-in and configured services.
         Config.Companion.getInstance();
         ServiceRegistry.INSTANCE.getAllServices();
 

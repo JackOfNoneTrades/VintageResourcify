@@ -41,7 +41,8 @@ class Config {
     var markdownTheme: String = "dark"
 
     companion object {
-        private val configFile = File("./config/resourcify.json")
+        private val configDir = File("./config/vintageresourcify")
+        private val configFile = File(configDir, "resourcify.json")
         private val loadCallbacks = CopyOnWriteArrayList<Runnable>()
 
         @JvmStatic
@@ -56,6 +57,7 @@ class Config {
         }
 
         private fun load(): Config {
+            ensureConfigDirectory()
             return try {
                 configFile.readText().fromJson()
             } catch (e: Exception) {
@@ -87,10 +89,21 @@ class Config {
             return instance
         }
 
+        @JvmStatic
+        fun getConfigDirectory(): File {
+            ensureConfigDirectory()
+            return configDir
+        }
+
         fun save(config: Config = instance) {
+            ensureConfigDirectory()
             configFile.outputStream().bufferedWriter().use {
                 it.write(config.toJson())
             }
+        }
+
+        private fun ensureConfigDirectory() {
+            if (!configDir.exists()) configDir.mkdirs()
         }
 
         private fun fireLoadCallbacks() {

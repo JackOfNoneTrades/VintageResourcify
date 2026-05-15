@@ -62,13 +62,23 @@ data class FullModrinthProject(
     @Transient
     private var versionsRequest: CompletableFuture<List<ModrinthVersion>>? = null
 
+    @Transient
+    private var service: ModrinthApiService? = null
+
+    internal fun bindService(service: ModrinthApiService): FullModrinthProject {
+        this.service = service
+        return this
+    }
+
+    private fun service(): ModrinthApiService = service ?: ModrinthService
+
     override fun getName(): String = title
     override fun getId(): String = id
     override fun getSummary(): String = description
     override fun getAuthor(): String = membersRequest?.getNow(null)?.firstOrNull()?.user?.name ?: ""
     override fun getDownloads(): Int = downloads
 
-    override fun getBrowserUrl(): String = "https://modrinth.com/$projectType/$slug"
+    override fun getBrowserUrl(): String = "${service().browserBaseUrl}/$projectType/$slug"
 
     override fun getDescription(): CompletableFuture<String> = supply { body }
     override fun getIconUrl(): URL? = iconUrl?.toURL()
@@ -100,7 +110,7 @@ data class FullModrinthProject(
 
     private fun fetchMembers(): CompletableFuture<List<PartialModrinthProject.Member>?> {
         return membersRequest ?: supplyAsync {
-            URL("${ModrinthService.API}/project/$slug/members").getJson<List<PartialModrinthProject.Member>>()
+            URL("${service().apiUrl}/project/$slug/members").getJson<List<PartialModrinthProject.Member>>()
         }.apply { membersRequest = this }
     }
 
@@ -112,7 +122,7 @@ data class FullModrinthProject(
 
     override fun getVersions(): CompletableFuture<List<IVersion>> {
         return (versionsRequest ?: supplyAsync {
-            URL("${ModrinthService.API}/project/$slug/version").getJson<List<ModrinthVersion>>()
+            URL("${service().apiUrl}/project/$slug/version").getJson<List<ModrinthVersion>>()
                 ?.filter { it.hasFile() }
                 // Filter mods (jar files) out of datapack versions
                 ?.filter { projectType != "mod" || it.getLoaders().contains("datapack") }

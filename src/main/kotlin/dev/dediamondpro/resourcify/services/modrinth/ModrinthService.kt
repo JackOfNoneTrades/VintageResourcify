@@ -25,12 +25,17 @@ import java.net.URI
 import java.net.URL
 import java.util.concurrent.CompletableFuture
 
-object ModrinthService : IService {
-    const val API = "https://api.modrinth.com/v2"
+open class ModrinthApiService(
+    private val serviceName: String,
+    internal val apiUrl: String,
+    internal val browserBaseUrl: String,
+    private val stablePlatformId: String = serviceName.lowercase(),
+) : IService {
     private var minecraftVersions: CompletableFuture<List<ModrinthMinecraftVersion>>? = null
     private var categories: CompletableFuture<List<ModrinthCategory>>? = null
 
-    override fun getName(): String = "Modrinth"
+    override fun getName(): String = serviceName
+    override fun getPlatformId(): String = stablePlatformId
     override fun isProjectTypeSupported(type: ProjectType) = type.getProjectType() != null
 
     override fun search(
@@ -41,13 +46,14 @@ object ModrinthService : IService {
         offset: Int,
         type: ProjectType
     ): ISearchData? {
-        return URIBuilder("${API}/search")
+        return URIBuilder("${apiUrl}/search")
             .setParameter("query", query)
             .setParameter("facets", buildFacets(type, minecraftVersions, categories))
             .setParameter("limit", "20")
             .setParameter("offset", offset.toString())
             .setParameter("index", sortBy)
             .build().toURL().getJson<ModrinthSearchData>()
+            ?.also { result -> result.projects.forEach { it.bindService(this) } }
     }
 
     private fun buildFacets(type: ProjectType, minecraftVersions: List<String>, categories: List<String>): String =
@@ -84,7 +90,7 @@ object ModrinthService : IService {
     private fun fetchMinecraftVersions() {
         if (minecraftVersions != null && minecraftVersions?.isDone == true && minecraftVersions?.isCompletedExceptionally == false) return
         minecraftVersions = supplyAsync {
-            URL("https://api.modrinth.com/v2/tag/game_version")
+            URL("$apiUrl/tag/game_version")
                 .getJson<List<ModrinthMinecraftVersion>>(useCache = false)
                 ?: error("Failed to fetch Minecraft versions.")
         }
@@ -110,7 +116,7 @@ object ModrinthService : IService {
     private fun fetchCategories() {
         if (categories != null && categories?.isDone == true && categories?.isCompletedExceptionally == false) return
         categories = supplyAsync {
-            URL("$API/tag/category")
+            URL("$apiUrl/tag/category")
                 .getJson<List<ModrinthCategory>>(useCache = false)
                 ?: error("Failed to fetch categories.")
         }.thenApply {
@@ -122,7 +128,7 @@ object ModrinthService : IService {
     }
 
     override fun canFetchProjectUrl(uri: URI): Boolean {
-        return uri.host == "modrinth.com"
+        return uri.host == browserBaseUrl.toURIOrNull()?.host
     }
 
     override fun fetchProjectFromUrl(uri: URI): Pair<ProjectType, CompletableFuture<IProject?>>? {
@@ -137,16 +143,17 @@ object ModrinthService : IService {
             "mod", "modpack", "plugin" -> ProjectType.UNKNOWN
             else -> return null // Probably not a project url
         }
-        val url = "$API/project/${path[1]}".toURL() ?: return null
+        val url = "$apiUrl/project/${path[1]}".toURL() ?: return null
         return type to supplyAsync {
-            url.getJson<FullModrinthProject>()
+            url.getJson<FullModrinthProject>()?.bindService(this)
         }
     }
 
     override fun getProjectsFromIds(ids: List<String>): Map<String, IProject> {
         val idString = ids.joinToString(",", "[", "]") { "\"${it}\"" }
-        return URIBuilder("${API}/projects").setParameter("ids", idString)
+        return URIBuilder("${apiUrl}/projects").setParameter("ids", idString)
             .build().toURL().getJson<List<FullModrinthProject>>()!!
+            .onEach { it.bindService(this) }
             .associateBy { project -> ids.first { project.getId() == it } }
     }
 
@@ -162,7 +169,7 @@ object ModrinthService : IService {
                 ProjectType.OPTIFINE_SHADER -> "optifine"
                 else -> error("$type is not supported in updates")
             }
-            val data: Map<String, ModrinthVersion> = URL("${API}/version_files/update").postAndGetJson<Map<String, ModrinthVersion>, ModrinthUpdateFormat>(
+            val data: Map<String, ModrinthVersion> = URL("${apiUrl}/version_files/update").postAndGetJson<Map<String, ModrinthVersion>, ModrinthUpdateFormat>(
                 ModrinthUpdateFormat(loaders = listOf(loader), hashes = hashes.keys.toList())
             ) ?: error("Failed to fetch updates")
             // Associate with file, and if we already have the latest version, set the result to null
@@ -186,4 +193,13 @@ object ModrinthService : IService {
         "newest" to "resourcify.browse.sort.newest",
         "updated" to "resourcify.browse.sort.updated",
     )
+}
+
+object ModrinthService : ModrinthApiService(
+    "Modrinth",
+    "https://api.modrinth.com/v2",
+    "https://modrinth.com",
+    "modrinth",
+) {
+    const val API = "https://api.modrinth.com/v2"
 }
