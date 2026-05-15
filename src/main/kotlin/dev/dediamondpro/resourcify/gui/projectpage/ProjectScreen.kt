@@ -46,9 +46,9 @@ import dev.dediamondpro.resourcify.util.AsyncIcon
 import dev.dediamondpro.resourcify.util.formatCompact
 import dev.dediamondpro.resourcify.util.DownloadManager
 import dev.dediamondpro.resourcify.util.DownloadResult
-import dev.dediamondpro.resourcify.util.IrisHelper
 import dev.dediamondpro.resourcify.util.LocalIndex
 import dev.dediamondpro.resourcify.util.MarkdownRenderer
+import dev.dediamondpro.resourcify.util.ShaderGuiHelper
 import dev.dediamondpro.resourcify.util.UrlOpener
 import dev.dediamondpro.resourcify.util.getImageAsync
 import dev.dediamondpro.resourcify.util.toURL
@@ -483,14 +483,14 @@ class ProjectScreen(
 
     fun enableDownloaded(): Boolean {
         val file = downloadedFile[0] ?: return true
-        val enabled = if (isShader) IrisHelper.enableShaderPack(file) else Platform.enableResourcePack(file)
+        val enabled = if (isShader) ShaderGuiHelper.enableShaderPack(file) else Platform.enableResourcePack(file)
         downloadStatus[0] = if (enabled) "Enabled" else "Could not enable automatically"
         return true
     }
 
     fun openManageScreen(): Boolean {
         if (isShader) {
-            if (!IrisHelper.openShaderPackScreen(sourceParent) && sourceParent != null) {
+            if (!ShaderGuiHelper.openShaderPackScreen(sourceParent) && sourceParent != null) {
                 Minecraft.getMinecraft().displayGuiScreen(sourceParent)
             }
         } else {

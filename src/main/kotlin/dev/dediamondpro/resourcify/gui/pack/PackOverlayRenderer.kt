@@ -19,8 +19,8 @@ package dev.dediamondpro.resourcify.gui.pack
 
 import dev.dediamondpro.resourcify.VintageResourcify
 import dev.dediamondpro.resourcify.config.ConfiguredPlatforms
-import dev.dediamondpro.resourcify.util.IrisHelper
 import dev.dediamondpro.resourcify.util.LocalIndex
+import dev.dediamondpro.resourcify.util.ShaderGuiHelper
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Gui
 import net.minecraft.client.renderer.OpenGlHelper
@@ -311,12 +311,11 @@ object PackOverlayRenderer {
             // entry loaded and the host re-renders the row.
             try {
                 val mc = Minecraft.getMinecraft()
-                val shadersFolder = try { IrisHelper.getShaderpacksFolder() } catch (_: Throwable) { null }
+                val shadersFolder = try { ShaderGuiHelper.getShaderpacksFolder() } catch (_: Throwable) { null }
                 if (shadersFolder != null && hit.folder.canonicalPath == shadersFolder.canonicalPath) {
-                    // Shader pack delete: ask Iris to reload so the
-                    // currently-applied pack drops if it was the deleted
-                    // one and the available list is rescanned.
-                    IrisHelper.reload()
+                    // Shader pack delete: ask the active shader GUI backend
+                    // to rescan and drop the active pack if it was removed.
+                    ShaderGuiHelper.reload()
                 } else {
                     val repo = mc.resourcePackRepository
                     val current = ArrayList(repo.repositoryEntries)
@@ -359,8 +358,8 @@ object PackOverlayRenderer {
         t.addVertex(left.toDouble(), top.toDouble(), 0.0)
     }
 
-    /** Resolve the Iris shaderpacks folder once per call; cheap and safe to call from a render path. */
-    fun shaderpacksFolder(): File = IrisHelper.getShaderpacksFolder()
+    /** Resolve the shaderpacks folder once per call; cheap and safe to call from a render path. */
+    fun shaderpacksFolder(): File = ShaderGuiHelper.getShaderpacksFolder()
 
     fun resourcePacksFolder(): File = Minecraft.getMinecraft().resourcePackRepository.dirResourcepacks
 

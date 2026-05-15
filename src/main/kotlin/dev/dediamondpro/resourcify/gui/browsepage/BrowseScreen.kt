@@ -39,8 +39,8 @@ import dev.dediamondpro.resourcify.services.ServiceRegistry
 import dev.dediamondpro.resourcify.util.AsyncIcon
 import dev.dediamondpro.resourcify.util.ClientGuiTasks
 import dev.dediamondpro.resourcify.util.formatCompact
-import dev.dediamondpro.resourcify.util.IrisHelper
 import dev.dediamondpro.resourcify.util.MultiThreading
+import dev.dediamondpro.resourcify.util.ShaderGuiHelper
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiScreen
 import net.minecraft.client.gui.ScaledResolution
@@ -204,7 +204,7 @@ class BrowseScreen(
     // Type switcher: two buttons, one per supported pack type. Hidden tab
     // for shaders when Iris/Angelica isn't loaded. Width is set wide enough
     // that "Resource Packs" fits on a single line at default font scale.
-    val shadersAvailable = IrisHelper.isPresent()
+    val shadersAvailable = ShaderGuiHelper.isPresent()
     val packsTab = SimpleButton().size(112, 18)
     val shadersTab = SimpleButton().size(112, 18)
 
@@ -444,7 +444,7 @@ class BrowseScreen(
         currentMcVersions = listOf(Platform.getMcVersion())
         searchBox.text = ""
         packsFolder = when (t) {
-            ProjectType.IRIS_SHADER -> IrisHelper.getShaderpacksFolder()
+            ProjectType.IRIS_SHADER -> ShaderGuiHelper.getShaderpacksFolder()
             else -> Minecraft.getMinecraft().resourcePackRepository.dirResourcepacks
         }
         refreshTabLabels()

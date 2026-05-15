@@ -13,4 +13,8 @@ repositories {
         name = "DeDiamondPro Maven"
         url = "https://maven.dediamondpro.dev/releases/"
     }
+    maven {
+        name = "Ventooth Maven"
+        url = "https://mvn.ventooth.com/releases/"
+    }
 }

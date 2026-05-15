@@ -28,7 +28,7 @@ import dev.dediamondpro.resourcify.services.ProjectType
 import dev.dediamondpro.resourcify.services.ServiceRegistry
 import dev.dediamondpro.resourcify.util.DownloadManager
 import dev.dediamondpro.resourcify.util.DownloadResult
-import dev.dediamondpro.resourcify.util.IrisHelper
+import dev.dediamondpro.resourcify.util.ShaderGuiHelper
 import dev.dediamondpro.resourcify.util.LocalIndex
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Gui
@@ -242,7 +242,7 @@ object PackScreensAddition {
         updatePanelOpen = false
         val grandparent: GuiScreen? = when {
             screen is PackScreenAccessor -> (screen as PackScreenAccessor).parentScreen
-            else -> IrisHelper.getShaderScreenParent(screen)
+            else -> ShaderGuiHelper.getShaderScreenParent(screen)
         }
         ClientGUI.open(BrowseScreen(type, folder, grandparent))
     }
@@ -321,7 +321,7 @@ object PackScreensAddition {
             ProjectType.RESOURCE_PACK,
             ProjectType.AYCY_RESOURCE_PACK -> Minecraft.getMinecraft().resourcePackRepository.dirResourcepacks
             ProjectType.IRIS_SHADER,
-            ProjectType.OPTIFINE_SHADER -> IrisHelper.getShaderpacksFolder()
+            ProjectType.OPTIFINE_SHADER -> ShaderGuiHelper.getShaderpacksFolder()
             else -> folder
         }
     }
@@ -608,7 +608,7 @@ object PackScreensAddition {
         val prepared = entries.map { entry ->
             val wasEnabled = when (type) {
                 ProjectType.RESOURCE_PACK, ProjectType.AYCY_RESOURCE_PACK -> Platform.isResourcePackEnabled(entry.oldFile)
-                ProjectType.IRIS_SHADER, ProjectType.OPTIFINE_SHADER -> IrisHelper.isShaderPackEnabled(entry.oldFile)
+                ProjectType.IRIS_SHADER, ProjectType.OPTIFINE_SHADER -> ShaderGuiHelper.isShaderPackEnabled(entry.oldFile)
                 else -> false
             }
             PreparedUpdate(entry, wasEnabled)
@@ -710,7 +710,7 @@ object PackScreensAddition {
                     }
                     ProjectType.IRIS_SHADER, ProjectType.OPTIFINE_SHADER -> {
                         if (item.wasEnabled) {
-                            IrisHelper.enableShaderPack(newFile)
+                            ShaderGuiHelper.enableShaderPack(newFile)
                         }
                         refreshHostPackScreen(type)
                     }
@@ -959,7 +959,7 @@ object PackScreensAddition {
                 screen is GuiScreenResourcePacks &&
                     sameFile(folder, Minecraft.getMinecraft().resourcePackRepository.dirResourcepacks)
             ProjectType.IRIS_SHADER, ProjectType.OPTIFINE_SHADER ->
-                IrisHelper.isShaderPackScreen(screen) && sameFile(folder, IrisHelper.getShaderpacksFolder())
+                ShaderGuiHelper.isShaderPackScreen(screen) && sameFile(folder, ShaderGuiHelper.getShaderpacksFolder(screen))
             else -> false
         }
     }
@@ -1033,8 +1033,8 @@ object PackScreensAddition {
                 }
             }
             ProjectType.IRIS_SHADER, ProjectType.OPTIFINE_SHADER -> {
-                val parent = screen?.let { IrisHelper.getShaderScreenParent(it) }
-                IrisHelper.openShaderPackScreen(parent)
+                val parent = screen?.let { ShaderGuiHelper.getShaderScreenParent(it) }
+                ShaderGuiHelper.openShaderPackScreen(parent)
             }
             else -> {}
         }

@@ -2,7 +2,7 @@ package dev.dediamondpro.resourcify.gui.pack
 
 import dev.dediamondpro.resourcify.VintageResourcify
 import dev.dediamondpro.resourcify.services.ProjectType
-import dev.dediamondpro.resourcify.util.IrisHelper
+import dev.dediamondpro.resourcify.util.ShaderGuiHelper
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Gui
 import net.minecraft.client.gui.GuiScreen
@@ -59,10 +59,10 @@ object PackDropHandler : DropListener {
                 ProjectType.RESOURCE_PACK,
                 mc.resourcePackRepository.dirResourcepacks,
             )
-            IrisHelper.isShaderPackScreen(screen) -> DropContext(
+            ShaderGuiHelper.isShaderPackScreen(screen) -> DropContext(
                 screen,
                 ProjectType.IRIS_SHADER,
-                IrisHelper.getShaderpacksFolder(),
+                ShaderGuiHelper.getShaderpacksFolder(screen),
             )
             else -> null
         }

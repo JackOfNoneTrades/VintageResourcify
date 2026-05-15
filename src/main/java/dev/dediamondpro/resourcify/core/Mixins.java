@@ -52,6 +52,16 @@ public class Mixins extends FentMixins {
             .side(Side.CLIENT)
             .phase(Phase.EARLY)
             .build();
+        registry.mixin("MixinSwanSongGuiShaders")
+            .modid("swansong")
+            .side(Side.CLIENT)
+            .phase(Phase.EARLY)
+            .build();
+        registry.mixin("MixinSwanSongGuiSlotShaders")
+            .modid("swansong")
+            .side(Side.CLIENT)
+            .phase(Phase.EARLY)
+            .build();
     }
 
     public static java.util.List<String> getEarlyMixinsForLoader() {
