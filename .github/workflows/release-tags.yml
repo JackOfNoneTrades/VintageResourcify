@@ -18,6 +18,7 @@ jobs:
       MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
   publish-67minecraft:
     runs-on: ubuntu-24.04
+    if: ${{ github.ref_type == 'tag' }}
     needs: release-tags
     env:
       VERSION: ${{ github.ref_name }}
