@@ -6,7 +6,7 @@
 
 [![hub](images/badges/github.png)](https://github.com/JackOfNoneTrades/VintageResourcify/releases)
 [![67](images/badges/67.png)](https://67.fentanylsolutions.org/mod/vintage-resourcify)
-[![maven](images/badges/maven.png)](https://maven.fentanylsolutions.org/#/releases/org/fentanylsolutions/vintageresourcify/VintageResourcify)
+[![maven](images/badges/maven.png)](https://maven.fentanylsolutions.org/#/releases/dev/dediamondpro/resourcify/VintageResourcify)
 ![forge](images/badges/forge.png)
 [![cord](images/badges/cord.png)](https://discord.gg/xAWCqGrguG)
 
