@@ -31,6 +31,11 @@ import com.cleanroommc.modularui.widgets.layout.Flow
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget
 import dev.dediamondpro.resourcify.VintageResourcify
 import dev.dediamondpro.resourcify.config.Config
+import dev.dediamondpro.resourcify.gui.CloseButtonDrawable
+import dev.dediamondpro.resourcify.gui.CLOSE_BUTTON_RIGHT
+import dev.dediamondpro.resourcify.gui.CLOSE_BUTTON_SIZE
+import dev.dediamondpro.resourcify.gui.CLOSE_BUTTON_TOP
+import dev.dediamondpro.resourcify.gui.closeLikeEscape
 import dev.dediamondpro.resourcify.gui.projectpage.ProjectScreen
 import dev.dediamondpro.resourcify.platform.Platform
 import dev.dediamondpro.resourcify.services.IProject
@@ -462,6 +467,20 @@ class BrowseScreen(
         .child(packsTab.margin(0, 4, 0, 0))
         .apply { if (shadersAvailable) child(shadersTab) }
 
+    val closeButton = SimpleButton()
+        .top(CLOSE_BUTTON_TOP).right(CLOSE_BUTTON_RIGHT).size(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
+        .disableThemeBackground(true)
+        .disableHoverThemeBackground(true)
+        .overlay(CloseButtonDrawable(false))
+        .hoverOverlay(CloseButtonDrawable(true))
+        .onMousePressed { b ->
+            if (b == 0) {
+                closeLikeEscape()
+                true
+            } else false
+        }
+    closeButton.tooltip().addLine("Close")
+
     // Search fires automatically on idle via the tick-driven debounce below;
     // Enter still triggers an immediate search through searchBox's key handler.
     val searchRow = Flow.row().top(28).left(10).right(10).height(16)
@@ -505,6 +524,7 @@ class BrowseScreen(
         // versionDropdownHolder is declared LAST so its open dropdown menu
         // paints over filtersList instead of being hidden behind it.
         .child(versionDropdownHolder)
+        .child(closeButton)
 })
 
 /** Project result card: thumbnail + title + author + summary, clickable. */

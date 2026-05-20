@@ -37,6 +37,11 @@ import com.cleanroommc.modularui.widget.Widget
 import com.cleanroommc.modularui.widgets.layout.Flow
 import dev.dediamondpro.resourcify.VintageResourcify
 import dev.dediamondpro.resourcify.config.Config
+import dev.dediamondpro.resourcify.gui.CloseButtonDrawable
+import dev.dediamondpro.resourcify.gui.CLOSE_BUTTON_RIGHT
+import dev.dediamondpro.resourcify.gui.CLOSE_BUTTON_SIZE
+import dev.dediamondpro.resourcify.gui.CLOSE_BUTTON_TOP
+import dev.dediamondpro.resourcify.gui.closeLikeEscape
 import dev.dediamondpro.resourcify.platform.Platform
 import dev.dediamondpro.resourcify.services.IGalleryImage
 import dev.dediamondpro.resourcify.services.IProject
@@ -1030,6 +1035,20 @@ class ProjectScreen(
         }
     websiteButton.tooltip().addLine("Open Project Page")
 
+    val closeButton = SimpleButton()
+        .top(CLOSE_BUTTON_TOP).right(CLOSE_BUTTON_RIGHT).size(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
+        .disableThemeBackground(true)
+        .disableHoverThemeBackground(true)
+        .overlay(CloseButtonDrawable(false))
+        .hoverOverlay(CloseButtonDrawable(true))
+        .onMousePressed { btn ->
+            if (btn == 0) {
+                closeLikeEscape()
+                true
+            } else false
+        }
+    closeButton.tooltip().addLine("Close")
+
     val versionsHeader = TextWidget(IKey.str("Versions").style(EnumChatFormatting.BOLD))
         .top(bodyTop).left(verColLeft).width(verColW).height(14)
         .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
@@ -1057,6 +1076,7 @@ class ProjectScreen(
         .child(descriptionList)
         .child(galleryButton)
         .child(websiteButton)
+        .child(closeButton)
         .child(versionsHeader)
         .child(versionsList)
         // Last child so the dropdown popup paints over versionsList rather
