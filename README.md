@@ -5,6 +5,7 @@
 ![logo](images/logo_small.png)
 
 [![hub](images/badges/github.png)](https://github.com/JackOfNoneTrades/VintageResourcify/releases)
+[![curse](images/badges/curse.png)](https://www.curseforge.com/minecraft/mc-mods/vintage-resourcify)
 [![67](images/badges/67.png)](https://67.fentanylsolutions.org/mod/vintage-resourcify)
 [![maven](images/badges/maven.png)](https://maven.fentanylsolutions.org/#/releases/dev/dediamondpro/resourcify/VintageResourcify)
 ![forge](images/badges/forge.png)
@@ -13,7 +14,6 @@
 ### ⚠️ this project's CurseForge API token has not be approved yet. Please set your own in the config.
 
 <!--
-[![curse](images/badges/curse.png)](https://www.curseforge.com/minecraft/mc-mods/x)
 [![modrinth](images/badges/modrinth.png)](https://modrinth.com/mod/x)
 [![mcmodcn](images/badges/mcmodcn.png)]()-->
 
