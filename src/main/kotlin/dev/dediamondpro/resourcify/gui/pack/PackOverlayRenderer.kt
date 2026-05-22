@@ -36,7 +36,7 @@ import javax.imageio.ImageIO
  * sourced from the local install index. Pack files we did not install (and
  * thus have no index entry for) get no badge.
  *
- * Built-in platform icons live under `assets/resourcify/platform/<id>.png`.
+ * Built-in platform icons live under `assets/vintage-resourcify/platform/<id>.png`.
  * Configured platform icons are loaded from config/vintageresourcify/icons.
  */
 object PackOverlayRenderer {

@@ -23,6 +23,6 @@ import dev.dediamondpro.resourcify.util.localize
 object DefaultAdProvider : IAdProvider {
     override fun isAdAvailable(): Boolean = Config.instance.adsEnabled
     override fun getText(): String = "resourcify.browse.bisect_ad".localize()
-    override fun getImagePath(): String = "/assets/resourcify/bisect-logo.png"
+    override fun getImagePath(): String = "/assets/vintage-resourcify/bisect-logo.png"
     override fun getUrl(): String = "https://bisecthosting.com/diamond?r=resourcify"
 }

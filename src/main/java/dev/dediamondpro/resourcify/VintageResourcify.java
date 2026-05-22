@@ -23,7 +23,7 @@ import dev.dediamondpro.resourcify.config.Config;
             v = "https://github.com/JackOfNoneTrades/VintageResourcify/issues") })
 public class VintageResourcify {
 
-    public static final String MODID = "resourcify";
+    public static final String MODID = "vintage-resourcify";
     public static final String MODGROUP = "dev.dediamondpro.resourcify";
     public static final Logger LOG = LogManager.getLogger(MODID);
 
