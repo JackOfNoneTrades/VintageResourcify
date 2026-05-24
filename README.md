@@ -49,7 +49,7 @@ Vintage Resourcify supports Angelica [![curse](images/icons/curse.png)](https://
 
 ## License
 
-`LgplV3 + SNEED`.
+`LGPLv3`.
 
 * [Resourcify assets and code are licensed under GPLv3](https://github.com/DeDiamondPro/Resourcify/blob/master/LICENSE).
 
@@ -60,4 +60,4 @@ Vintage Resourcify supports Angelica [![curse](images/icons/curse.png)](https://
 
 <br>
 
-![license](images/lgplsneed_small.png)
+![license](images/license_small.png)

@@ -17,7 +17,7 @@ import dev.dediamondpro.resourcify.config.Config;
     acceptedMinecraftVersions = "[1.7.10]",
     acceptableRemoteVersions = "*",
     guiFactory = "dev.dediamondpro.resourcify.gui.config.ResourcifyGuiFactory",
-    customProperties = { @Mod.CustomProperty(k = "license", v = "LGPLv3+SNEED"),
+    customProperties = { @Mod.CustomProperty(k = "license", v = "LGPLv3"),
         @Mod.CustomProperty(
             k = "issueTrackerUrl",
             v = "https://github.com/JackOfNoneTrades/VintageResourcify/issues") })
