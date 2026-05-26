@@ -57,6 +57,10 @@ object ServiceRegistry {
     fun loadConfiguredServices() {
         services.removeAll(configuredServices)
         configuredServices.clear()
+        if (!DistributionPolicy.allowConfiguredPlatforms()) {
+            VintageResourcify.LOG.info("Configured platforms are disabled for this distribution.")
+            return
+        }
         val platforms = ConfiguredPlatforms.load()
         for (platform in ConfiguredPlatforms.enabledPlatforms()) {
             val platformId = ConfiguredPlatforms.platformId(platform.name)

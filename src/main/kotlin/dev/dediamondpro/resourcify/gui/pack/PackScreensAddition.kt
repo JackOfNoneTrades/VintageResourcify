@@ -23,6 +23,7 @@ import dev.dediamondpro.resourcify.config.Config
 import dev.dediamondpro.resourcify.gui.browsepage.BrowseScreen
 import dev.dediamondpro.resourcify.mixins.early.minecraft.PackScreenAccessor
 import dev.dediamondpro.resourcify.platform.Platform
+import dev.dediamondpro.resourcify.services.DistributionPolicy
 import dev.dediamondpro.resourcify.services.IVersion
 import dev.dediamondpro.resourcify.services.ProjectType
 import dev.dediamondpro.resourcify.services.ServiceRegistry
@@ -377,6 +378,10 @@ object PackScreensAddition {
         val byPlatform = tracked.groupBy({ it.second.platform }) { it.first }
         val merged = mutableMapOf<File, IVersion>()
         for ((platform, files) in byPlatform) {
+            if (!DistributionPolicy.canDownloadFrom(platform)) {
+                VintageResourcify.LOG.info("Skipping updates from platform {} because downloads are disabled for this distribution", platform)
+                continue
+            }
             val service = ServiceRegistry.getAllServices()
                 .firstOrNull { it.getPlatformId() == platform && it.isProjectTypeSupported(type) }
             if (service == null) {

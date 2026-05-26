@@ -43,6 +43,7 @@ import dev.dediamondpro.resourcify.gui.CLOSE_BUTTON_SIZE
 import dev.dediamondpro.resourcify.gui.CLOSE_BUTTON_TOP
 import dev.dediamondpro.resourcify.gui.closeLikeEscape
 import dev.dediamondpro.resourcify.platform.Platform
+import dev.dediamondpro.resourcify.services.DistributionPolicy
 import dev.dediamondpro.resourcify.services.IGalleryImage
 import dev.dediamondpro.resourcify.services.IProject
 import dev.dediamondpro.resourcify.services.IVersion
@@ -461,6 +462,10 @@ class ProjectScreen(
 
     fun startDownload() {
         if (downloadState[0] == DownloadPanelState.DOWNLOADING) return
+        if (!DistributionPolicy.canDownloadFrom(platformId)) {
+            setDownloadState(DownloadPanelState.FAILED, DistributionPolicy.downloadBlockedMessage(platformId))
+            return
+        }
         val version = selectedDownloadVersion[0] ?: return
         val url = version.getDownloadUrl() ?: run {
             setDownloadState(DownloadPanelState.FAILED, "No download URL")

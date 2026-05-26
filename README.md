@@ -11,7 +11,9 @@
 ![forge](images/badges/forge.png)
 [![cord](images/badges/cord.png)](https://discord.gg/xAWCqGrguG)
 
-### ⚠️ this project's CurseForge API token has not be approved yet. Please set your own in the config.
+### ⚠️ This project's CurseForge API token has not be approved yet. Please set your own in the config.
+
+### ⚠️ The CurseForge version of this mod does not support downloading from third party Modrinth-compatible platforms.
 
 <!--
 [![modrinth](images/badges/modrinth.png)](https://modrinth.com/mod/x)
