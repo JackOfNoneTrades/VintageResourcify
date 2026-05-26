@@ -18,9 +18,8 @@ import dev.dediamondpro.resourcify.config.Config;
     acceptableRemoteVersions = "*",
     guiFactory = "dev.dediamondpro.resourcify.gui.config.ResourcifyGuiFactory",
     customProperties = { @Mod.CustomProperty(k = "license", v = "LGPLv3"),
-        @Mod.CustomProperty(
-            k = "issueTrackerUrl",
-            v = "https://github.com/JackOfNoneTrades/VintageResourcify/issues") })
+        @Mod.CustomProperty(k = "issueTrackerUrl", v = "https://github.com/JackOfNoneTrades/VintageResourcify/issues"),
+        @Mod.CustomProperty(k = "iconFile", v = "assets/vintage-resourcify/logo.png") })
 public class VintageResourcify {
 
     public static final String MODID = "vintage-resourcify";
