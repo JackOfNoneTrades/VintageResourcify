@@ -160,11 +160,15 @@ val curseForgeJar = tasks.register<Jar>("curseForgeJar") {
         exclude(
             "META-INF/MANIFEST.MF",
             "mcmod.info",
+            "dev/dediamondpro/resourcify/config/ConfiguredPlatforms*.class",
             "dev/dediamondpro/resourcify/services/DistributionPolicy.class",
         )
     }
     from(curseForgeReplacementSourceSet.output.classesDirs) {
-        include("dev/dediamondpro/resourcify/services/DistributionPolicy.class")
+        include(
+            "dev/dediamondpro/resourcify/config/ConfiguredPlatforms.class",
+            "dev/dediamondpro/resourcify/services/DistributionPolicy.class",
+        )
     }
     from(curseForgeMcmodInfoFile)
 }
