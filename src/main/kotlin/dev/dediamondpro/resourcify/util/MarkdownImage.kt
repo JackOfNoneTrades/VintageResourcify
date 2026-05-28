@@ -45,6 +45,8 @@ class MarkdownImage(
     private val url: URL,
     private val maxWidth: Int,
     private val linkUrl: String? = null,
+    private val requestedWidth: Int? = null,
+    private val requestedHeight: Int? = null,
 ) : Widget<MarkdownImage>(), Interactable {
 
     private var requested = false
@@ -54,7 +56,15 @@ class MarkdownImage(
     private var failed = false
 
     init {
-        widthRel(1f)
+        val fixedWidth = requestedWidth?.coerceIn(1, maxWidth)
+        if (fixedWidth != null) {
+            width(fixedWidth)
+        } else {
+            widthRel(1f)
+        }
+        if (requestedHeight != null && requestedHeight > 0) {
+            height(scaleRequestedHeight(fixedWidth))
+        }
         if (linkUrl != null) {
             tooltip().addLine(linkUrl)
         }
@@ -82,11 +92,11 @@ class MarkdownImage(
 
     override fun getDefaultHeight(): Int {
         if (failed) return 12
-        val w = if (imgW > 0) imgW else maxWidth
-        val h = if (imgH > 0) imgH else 32
-        // Scale to fit within column.
-        val scale = if (w > maxWidth) maxWidth.toFloat() / w else 1f
-        return (h * scale).toInt().coerceAtLeast(8)
+        requestedHeight?.let { height ->
+            if (height > 0) return scaleRequestedHeight(requestedWidth?.coerceIn(1, maxWidth))
+        }
+        if (imgW <= 0 || imgH <= 0) return 32
+        return scaledHeightFor(targetWidth(imgW), imgW, imgH)
     }
 
     override fun draw(context: ModularGuiContext, widgetTheme: WidgetThemeEntry<*>) {
@@ -95,15 +105,11 @@ class MarkdownImage(
         val w = imgW
         val h = imgH
         if (w <= 0 || h <= 0) return
-        val drawW: Int
-        val drawH: Int
-        if (w > maxWidth) {
-            drawW = maxWidth
-            drawH = (h.toFloat() * maxWidth / w).toInt()
-        } else {
-            drawW = w
-            drawH = h
-        }
+        val drawW = targetWidth(w)
+        val drawH = requestedHeight
+            ?.takeIf { it > 0 }
+            ?.let { scaleRequestedHeight(drawW) }
+            ?: scaledHeightFor(drawW, w, h)
         // See AsyncIcon: Gui.func_152125_a doesn't set up textures/blend
         // itself, so set them up defensively or first-in-frame images render
         // as solid white quads.
@@ -113,6 +119,23 @@ class MarkdownImage(
         Minecraft.getMinecraft().textureManager.bindTexture(rl)
         GL11.glColor4f(1f, 1f, 1f, 1f)
         Gui.func_152125_a(0, 0, 0f, 0f, w, h, drawW, drawH, w.toFloat(), h.toFloat())
+    }
+
+    private fun targetWidth(naturalWidth: Int): Int {
+        val hinted = requestedWidth?.takeIf { it > 0 } ?: naturalWidth
+        return hinted.coerceAtMost(maxWidth).coerceAtLeast(1)
+    }
+
+    private fun scaledHeightFor(targetWidth: Int, naturalWidth: Int, naturalHeight: Int): Int {
+        if (naturalWidth <= 0 || naturalHeight <= 0) return 32
+        return (naturalHeight.toFloat() * targetWidth / naturalWidth).toInt().coerceAtLeast(8)
+    }
+
+    private fun scaleRequestedHeight(widthAfterClamp: Int?): Int {
+        val height = requestedHeight?.takeIf { it > 0 } ?: return 32
+        val width = requestedWidth?.takeIf { it > 0 } ?: return height.coerceAtLeast(8)
+        val actualWidth = widthAfterClamp ?: width.coerceAtMost(maxWidth)
+        return (height.toFloat() * actualWidth / width).toInt().coerceAtLeast(8)
     }
 
     private fun ensureRequested() {

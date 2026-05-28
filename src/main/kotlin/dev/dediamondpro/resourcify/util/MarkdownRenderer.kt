@@ -21,6 +21,7 @@ import com.cleanroommc.modularui.api.drawable.IKey
 import com.cleanroommc.modularui.api.widget.IWidget
 import com.cleanroommc.modularui.drawable.Rectangle
 import com.cleanroommc.modularui.widgets.TextWidget
+import com.cleanroommc.modularui.widgets.layout.Flow
 import dev.dediamondpro.resourcify.config.Config
 import net.minecraft.client.Minecraft
 import net.minecraft.util.EnumChatFormatting
@@ -78,15 +79,26 @@ object MarkdownRenderer {
         """<a\b[^>]*?href\s*=\s*"([^"]*)"[^>]*>([\s\S]*?)</a>""",
         setOf(RegexOption.IGNORE_CASE)
     )
-    private val attrSrc = Regex("""src\s*=\s*"([^"]*)"""", RegexOption.IGNORE_CASE)
-    private val attrAlt = Regex("""alt\s*=\s*"([^"]*)"""", RegexOption.IGNORE_CASE)
+    // Match markdown links whose label is one or more raw HTML images:
+    // [<img .../> <img .../>](https://example.com). Without this pass, the
+    // later bare <img> promotion leaves the surrounding "[ ... ](url)" text
+    // visible around a block image.
+    private val markdownLinkedHtmlImages = Regex(
+        """\[((?:\s*<img\b[^>]*?/?>\s*)+)]\(([^)\s]+)(?:\s+"[^"]*")?\)""",
+        setOf(RegexOption.IGNORE_CASE)
+    )
+    private val attrSrc = Regex("""src\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))""", RegexOption.IGNORE_CASE)
+    private val attrAlt = Regex("""alt\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))""", RegexOption.IGNORE_CASE)
+    private val attrWidth = Regex("""width\s*=\s*(?:"(\d+)"|'(\d+)'|(\d+))""", RegexOption.IGNORE_CASE)
+    private val attrHeight = Regex("""height\s*=\s*(?:"(\d+)"|'(\d+)'|(\d+))""", RegexOption.IGNORE_CASE)
+    private val titleWidth = Regex("""(?:^|\s)width=(\d+)(?:\s|$)""")
+    private val titleHeight = Regex("""(?:^|\s)height=(\d+)(?:\s|$)""")
 
     fun render(markdown: String, widthPx: Int): List<IWidget> {
         // 1. Promote bare HTML <img> tags to markdown ![alt](src) so commonmark
         //    sees them as Image nodes instead of having them stripped silently.
-        // 2. Strip remaining HTML tags (links, divs, br, etc.). Surrounding
-        //    <a href> wrappers around images are dropped here - link target
-        //    is lost, but the image itself survives.
+        // 2. Strip remaining HTML tags (divs, br, center, etc.). Image links
+        //    have already been promoted to markdown links before this point.
         // 3. Strip leading whitespace per line. The HTML strip leaves tabs
         //    from the original markup, and CommonMark treats any line with
         //    4+ leading spaces or a tab as an indented code block (rendered
@@ -100,16 +112,29 @@ object MarkdownRenderer {
             val inner = m.groupValues[2]
             val imgMatch = htmlImg.find(inner) ?: return@replace m.value
             val attrs = imgMatch.groupValues[1]
-            val src = attrSrc.find(attrs)?.groupValues?.getOrNull(1) ?: return@replace ""
-            val alt = attrAlt.find(attrs)?.groupValues?.getOrNull(1) ?: ""
-            "\n\n[![$alt]($src)]($href)\n\n"
+            val src = attrValue(attrSrc, attrs) ?: return@replace ""
+            val alt = attrValue(attrAlt, attrs) ?: ""
+            "\n\n[${markdownImage(alt, src, attrs)}](${escapeDestination(href)})\n\n"
+        }
+        // Markdown link around raw HTML image(s):
+        // [<img src=A/> <img src=B/>](href) -> [![alt](A)](href) [![alt](B)](href)
+        val withMarkdownLinkedImages = markdownLinkedHtmlImages.replace(withLinkedImages) { m ->
+            val inner = m.groupValues[1]
+            val href = m.groupValues[2]
+            val images = htmlImg.findAll(inner).mapNotNull { img ->
+                val attrs = img.groupValues[1]
+                val src = attrValue(attrSrc, attrs) ?: return@mapNotNull null
+                val alt = attrValue(attrAlt, attrs) ?: ""
+                "[${markdownImage(alt, src, attrs)}](${escapeDestination(href)})"
+            }.toList()
+            images.joinToString(" ")
         }
         // Second: bare <img> outside an anchor -> plain markdown image.
-        val withImages = htmlImg.replace(withLinkedImages) { m ->
+        val withImages = htmlImg.replace(withMarkdownLinkedImages) { m ->
             val attrs = m.groupValues[1]
-            val src = attrSrc.find(attrs)?.groupValues?.getOrNull(1) ?: return@replace ""
-            val alt = attrAlt.find(attrs)?.groupValues?.getOrNull(1) ?: ""
-            "\n\n![$alt]($src)\n\n"
+            val src = attrValue(attrSrc, attrs) ?: return@replace ""
+            val alt = attrValue(attrAlt, attrs) ?: ""
+            "\n\n${markdownImage(alt, src, attrs)}\n\n"
         }
         val cleaned = withImages.replace(htmlTag, "")
             .lineSequence()
@@ -142,18 +167,18 @@ object MarkdownRenderer {
             // If the paragraph contains only image nodes (or links wrapping
             // image nodes), emit each as a block-level rendered image, with
             // the surrounding link's href attached so clicks open the URL.
-            val imageEntries = mutableListOf<Pair<Image, String?>>()
+            val imageEntries = mutableListOf<ImageEntry>()
             var hasNonImage = false
             var child = paragraph.firstChild
             while (child != null) {
                 when (child) {
-                    is Image -> imageEntries.add(child to null)
+                    is Image -> imageEntries.add(ImageEntry(child, null))
                     is Link -> {
-                        // A Link containing exactly one Image (whitespace
-                        // allowed) is the [![alt](src)](href) shape.
-                        val innerImage = sololImage(child)
-                        if (innerImage != null) {
-                            imageEntries.add(innerImage to child.destination)
+                        // Links containing only images are the [![alt](src)](href)
+                        // shape, sometimes repeated for compact badge rows.
+                        val innerImages = imageOnlyImages(child)
+                        if (innerImages != null) {
+                            innerImages.forEach { imageEntries.add(ImageEntry(it, child.destination)) }
                         } else {
                             hasNonImage = true
                         }
@@ -165,15 +190,7 @@ object MarkdownRenderer {
                 child = child.next
             }
             if (imageEntries.isNotEmpty() && !hasNonImage) {
-                imageEntries.forEach { (img, link) ->
-                    val url = try { URL(img.destination) } catch (_: Exception) { null }
-                    if (url != null) {
-                        out += MarkdownImage(url, width, link)
-                    } else {
-                        val alt = collectInline(img)
-                        if (alt.isNotEmpty()) emitLines("[$alt]", theme.muted)
-                    }
-                }
+                emitImages(imageEntries)
                 spacer()
                 return
             }
@@ -193,12 +210,63 @@ object MarkdownRenderer {
             }
         }
 
+        private fun emitImages(entries: List<ImageEntry>) {
+            val rendered = mutableListOf<RenderedImage>()
+            entries.forEach { entry ->
+                val url = try { URL(entry.image.destination) } catch (_: Exception) { null }
+                if (url == null) {
+                    val alt = collectInline(entry.image)
+                    if (alt.isNotEmpty()) emitLines("[$alt]", theme.muted)
+                    return@forEach
+                }
+                val size = imageSizeHint(entry.image)
+                val requestedWidth = size.width?.coerceAtLeast(1)
+                val widget = MarkdownImage(url, width, entry.linkUrl, requestedWidth, size.height?.coerceAtLeast(1))
+                rendered += RenderedImage(widget, requestedWidth?.coerceAtMost(width) ?: width, requestedWidth != null)
+            }
+            if (rendered.size > 1 && rendered.all { it.hasFixedWidth }) {
+                emitImageRows(rendered)
+            } else {
+                rendered.forEach { out += it.widget }
+            }
+        }
+
+        private fun emitImageRows(images: List<RenderedImage>) {
+            val gap = 6
+            val row = mutableListOf<RenderedImage>()
+            var rowWidth = 0
+
+            fun flushRow() {
+                if (row.isEmpty()) return
+                val flow = Flow.row()
+                    .width(rowWidth.coerceAtLeast(1))
+                    .coverChildrenHeight(8)
+                    .childPadding(gap)
+                row.forEach { flow.child(it.widget) }
+                out += flow
+                row.clear()
+                rowWidth = 0
+            }
+
+            images.forEach { image ->
+                val extraGap = if (row.isEmpty()) 0 else gap
+                val candidateWidth = rowWidth + extraGap + image.layoutWidth
+                if (row.isNotEmpty() && candidateWidth > width) {
+                    flushRow()
+                }
+                if (row.isNotEmpty()) rowWidth += gap
+                row += image
+                rowWidth += image.layoutWidth
+            }
+            flushRow()
+        }
+
         private fun hasInlineLink(node: Node): Boolean {
             var c = node.firstChild
             while (c != null) {
                 if (c is Link) {
                     // Image-only links are handled separately above.
-                    if (sololImage(c) == null) return true
+                    if (imageOnlyImages(c) == null) return true
                 }
                 if (c is Text && BARE_URL.containsMatchIn(c.literal)) return true
                 if (hasInlineLink(c)) return true
@@ -255,11 +323,13 @@ object MarkdownRenderer {
                     is Emphasis -> collectRuns(child, styles + "§o", linkUrl, out)
                     is Code -> out += MarkdownParagraph.Run(child.literal, styles + "§o", linkUrl)
                     is Link -> {
-                        val inner = sololImage(child)
-                        if (inner != null) {
-                            val alt = collectInline(inner)
-                            if (alt.isNotEmpty()) {
-                                out += MarkdownParagraph.Run("[$alt]", styles + "§n", child.destination)
+                        val images = imageOnlyImages(child)
+                        if (images != null) {
+                            images.forEach { image ->
+                                val alt = collectInline(image)
+                                if (alt.isNotEmpty()) {
+                                    out += MarkdownParagraph.Run("[$alt]", styles + "§n", child.destination)
+                                }
                             }
                         } else {
                             collectRuns(child, styles + "§n", child.destination, out)
@@ -354,23 +424,88 @@ object MarkdownRenderer {
         }
     }
 
-    /** Return the single Image child of [link] if its only content is one Image (whitespace allowed). */
-    private fun sololImage(link: Link): Image? {
-        var image: Image? = null
+    private data class ImageEntry(val image: Image, val linkUrl: String?)
+    private data class ImageSizeHint(val width: Int?, val height: Int?)
+    private data class RenderedImage(val widget: MarkdownImage, val layoutWidth: Int, val hasFixedWidth: Boolean)
+
+    /** Return Image children if [link] contains only images and whitespace. */
+    private fun imageOnlyImages(link: Link): List<Image>? {
+        val images = mutableListOf<Image>()
         var child = link.firstChild
         while (child != null) {
             when (child) {
-                is Image -> {
-                    if (image != null) return null
-                    image = child
-                }
+                is Image -> images += child
                 is Text -> if (child.literal.isNotBlank()) return null
                 is SoftLineBreak, is HardLineBreak -> {}
                 else -> return null
             }
             child = child.next
         }
-        return image
+        return images.ifEmpty { null }
+    }
+
+    private fun attrValue(regex: Regex, attrs: String): String? {
+        val match = regex.find(attrs) ?: return null
+        return match.groupValues.asSequence()
+            .drop(1)
+            .firstOrNull { it.isNotEmpty() }
+    }
+
+    private fun attrInt(regex: Regex, attrs: String): Int? {
+        return attrValue(regex, attrs)?.toIntOrNull()?.takeIf { it > 0 }
+    }
+
+    private fun markdownImage(alt: String, src: String, attrs: String): String {
+        val title = imageTitle(attrs)
+        return buildString {
+            append("![")
+            append(escapeLabel(alt))
+            append("](")
+            append(escapeDestination(src))
+            if (title != null) {
+                append(" \"")
+                append(escapeTitle(title))
+                append("\"")
+            }
+            append(")")
+        }
+    }
+
+    private fun imageTitle(attrs: String): String? {
+        val parts = mutableListOf<String>()
+        attrInt(attrWidth, attrs)?.let { parts += "width=$it" }
+        attrInt(attrHeight, attrs)?.let { parts += "height=$it" }
+        return parts.takeIf { it.isNotEmpty() }?.joinToString(" ")
+    }
+
+    private fun imageSizeHint(image: Image): ImageSizeHint {
+        val title = image.title ?: return ImageSizeHint(null, null)
+        val width = titleWidth.find(title)?.groupValues?.getOrNull(1)?.toIntOrNull()?.takeIf { it > 0 }
+        val height = titleHeight.find(title)?.groupValues?.getOrNull(1)?.toIntOrNull()?.takeIf { it > 0 }
+        return ImageSizeHint(width, height)
+    }
+
+    private fun escapeLabel(value: String): String {
+        return value
+            .replace("\\", "\\\\")
+            .replace("[", "\\[")
+            .replace("]", "\\]")
+    }
+
+    private fun escapeDestination(value: String): String {
+        return value
+            .replace("\\", "\\\\")
+            .replace("<", "%3C")
+            .replace(">", "%3E")
+            .replace(" ", "%20")
+            .replace("(", "%28")
+            .replace(")", "%29")
+    }
+
+    private fun escapeTitle(value: String): String {
+        return value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
     }
 
     /** Walk inline children of [node] and concatenate text with §-coded styles. */
