@@ -83,6 +83,7 @@ class BrowseScreen(
     val cardBg = if (isLight) 0x14000000 else 0x28FFFFFF
     val textPrimary = if (isLight) 0xFF1F2328.toInt() else 0xFFF0F6FC.toInt()
     val textSecondary = if (isLight) 0xFF59636E.toInt() else 0xFF9198A1.toInt()
+    val textSecondaryHover = if (isLight) 0xFF0B1F33.toInt() else 0xFFEAF2FF.toInt()
 
     var triggerSearch: (() -> Unit)? = null
     val searchBox = object : TextFieldWidget() {
@@ -186,7 +187,7 @@ class BrowseScreen(
                 val platformIdAtRequest = service.getPlatformId()
                 val mcVersionAtRequest = mcVersionsAtRequest.firstOrNull() ?: Platform.getMcVersion()
                 projects.forEach { project ->
-                    resultsList.child(buildCard(project, typeAtRequest, folderAtRequest, sourceParent, platformIdAtRequest, mcVersionAtRequest, cardBg, textPrimary, textSecondary))
+                    resultsList.child(buildCard(project, typeAtRequest, folderAtRequest, sourceParent, platformIdAtRequest, mcVersionAtRequest, cardBg, textPrimary, textSecondary, textSecondaryHover))
                 }
                 loadedCount += projects.size
                 if (loadedCount < totalCount && projects.isNotEmpty()) {
@@ -538,7 +539,9 @@ private fun buildCard(
     cardBg: Int,
     textPrimary: Int,
     textSecondary: Int,
+    textSecondaryHover: Int,
 ): IWidget {
+    val card = SimpleButton()
     val click = { btn: Int ->
         if (btn == 0) {
             VintageResourcify.LOG.info(
@@ -637,9 +640,8 @@ private fun buildCard(
             .removePrefix("§l") + "..."
     } else rawTitle
     // Author + downloads: same hard single-line treatment as the title. The
-    // raw string carries §-codes for the bullet, but trimStringToWidth measures
-    // them transparently, so feed the formatted string in directly.
-    val rawAuthor = "by ${project.getAuthor()}  §8•§r  ${project.getDownloads().formatCompact()} downloads"
+    // row uses a dynamic color so it stays readable on the hovered card.
+    val rawAuthor = "by ${project.getAuthor()}  •  ${project.getDownloads().formatCompact()} downloads"
     val authorLine = if (fr != null && fr.getStringWidth(rawAuthor) > summaryW) {
         fr.trimStringToWidth(rawAuthor, (summaryW - fr.getStringWidth("...")).coerceAtLeast(20)) + "..."
     } else rawAuthor
@@ -664,7 +666,7 @@ private fun buildCard(
         .child(
             TextWidget(IKey.str(authorLine))
                 .top(textTop + 11).left(textLeft).right(INNER_PAD).height(9)
-                .color(textSecondary)
+                .color { if (card.isHovering) textSecondaryHover else textSecondary }
                 .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
         )
         .child(
@@ -674,7 +676,7 @@ private fun buildCard(
                 .alignment(com.cleanroommc.modularui.utils.Alignment.TopLeft)
         )
 
-    return SimpleButton()
+    return card
         .widthRel(1f).height(CARD_HEIGHT).margin(0, 0, 0, CARD_GAP)
         .background(Rectangle().color(cardBg))
         .overlay()

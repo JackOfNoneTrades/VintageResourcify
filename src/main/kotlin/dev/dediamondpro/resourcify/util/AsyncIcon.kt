@@ -74,6 +74,8 @@ class AsyncIcon(private val url: URL?, private val sizePx: Int) : Widget<AsyncIc
         )
     }
 
+    override fun canHover(): Boolean = false
+
     private fun ensureRequested() {
         if (requested || url == null) return
         requested = true
