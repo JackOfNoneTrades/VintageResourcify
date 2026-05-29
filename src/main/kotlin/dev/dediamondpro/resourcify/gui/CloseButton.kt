@@ -42,5 +42,10 @@ class CloseButtonDrawable(private val hovered: Boolean) : IDrawable {
 }
 
 fun closeLikeEscape() {
-    ModularScreen.getCurrent()?.panelManager?.closeTopPanel()
+    val screen = ModularScreen.getCurrent() ?: return
+    val panelManager = screen.panelManager
+    if (panelManager.isMainPanel(panelManager.topMostPanel)) {
+        screen.openParentOnClose(true)
+    }
+    panelManager.closeTopPanel()
 }
