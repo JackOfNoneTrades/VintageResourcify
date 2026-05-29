@@ -22,9 +22,7 @@ import com.cleanroommc.modularui.api.drawable.IDrawable
 import com.cleanroommc.modularui.api.widget.Interactable
 import com.cleanroommc.modularui.api.widget.IWidget
 import com.cleanroommc.modularui.drawable.GuiDraw
-import com.cleanroommc.modularui.drawable.Rectangle
 import com.cleanroommc.modularui.screen.ModularPanel
-import com.cleanroommc.modularui.screen.ModularScreen
 import com.cleanroommc.modularui.screen.viewport.GuiContext
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext
 import com.cleanroommc.modularui.theme.WidgetTheme
@@ -41,7 +39,14 @@ import dev.dediamondpro.resourcify.gui.CloseButtonDrawable
 import dev.dediamondpro.resourcify.gui.CLOSE_BUTTON_RIGHT
 import dev.dediamondpro.resourcify.gui.CLOSE_BUTTON_SIZE
 import dev.dediamondpro.resourcify.gui.CLOSE_BUTTON_TOP
+import dev.dediamondpro.resourcify.gui.ResourcifyStyle
+import dev.dediamondpro.resourcify.gui.ResourcifyScreen
 import dev.dediamondpro.resourcify.gui.closeLikeEscape
+import dev.dediamondpro.resourcify.gui.sodiumButton
+import dev.dediamondpro.resourcify.gui.sodiumIconButton
+import dev.dediamondpro.resourcify.gui.sodiumSelectorItem
+import dev.dediamondpro.resourcify.gui.sodiumSurface
+import dev.dediamondpro.resourcify.gui.sodiumTransparent
 import dev.dediamondpro.resourcify.platform.Platform
 import dev.dediamondpro.resourcify.services.DistributionPolicy
 import dev.dediamondpro.resourcify.services.IGalleryImage
@@ -64,8 +69,6 @@ import net.minecraft.client.gui.GuiScreen
 import net.minecraft.client.gui.GuiScreenResourcePacks
 import net.minecraft.client.gui.ScaledResolution
 import net.minecraft.client.renderer.texture.DynamicTexture
-import net.minecraft.init.Items
-import net.minecraft.item.ItemStack
 import net.minecraft.util.ResourceLocation
 import net.minecraft.util.EnumChatFormatting
 import org.lwjgl.input.Keyboard
@@ -92,55 +95,38 @@ private class SimpleButton : ButtonWidget<SimpleButton>()
 private class SimpleList : ListWidget<IWidget, SimpleList>()
 private class Container : ParentWidget<Container>()
 
-private class CenteredItemDrawable(
-    private val stack: ItemStack,
-    private val itemSize: Int,
-    private val xOffset: Float = 0f,
-    private val yOffset: Float = 0f,
-) : IDrawable {
-    override fun draw(context: GuiContext, x: Int, y: Int, width: Int, height: Int, widgetTheme: WidgetTheme) {
-        applyColor(widgetTheme.color)
-        GL11.glPushMatrix()
-        try {
-            GL11.glTranslatef(xOffset, yOffset, 0f)
-            GuiDraw.drawItem(
-                stack,
-                x + (width - itemSize) / 2,
-                y + (height - itemSize) / 2,
-                itemSize.toFloat(),
-                itemSize.toFloat(),
-                context.currentDrawingZ,
-            )
-        } finally {
-            GL11.glPopMatrix()
-        }
-    }
-}
-
 private class CenteredTextureDrawable(
     private val texture: ResourceLocation,
     private val textureSize: Int,
     private val iconSize: Int,
+    private val xOffset: Float = 0f,
+    private val yOffset: Float = 0f,
+    private val darkened: Boolean = false,
 ) : IDrawable {
     override fun draw(context: GuiContext, x: Int, y: Int, width: Int, height: Int, widgetTheme: WidgetTheme) {
         applyColor(widgetTheme.color)
+        val shade = if (darkened) 0.55f else 1f
         GL11.glEnable(GL11.GL_TEXTURE_2D)
         GL11.glEnable(GL11.GL_BLEND)
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA)
         Minecraft.getMinecraft().textureManager.bindTexture(texture)
-        GL11.glColor4f(1f, 1f, 1f, 1f)
-        Gui.func_152125_a(
-            x + (width - iconSize) / 2,
-            y + (height - iconSize) / 2,
-            0f,
-            0f,
-            textureSize,
-            textureSize,
-            iconSize,
-            iconSize,
-            textureSize.toFloat(),
-            textureSize.toFloat(),
-        )
+        try {
+            GL11.glColor4f(shade, shade, shade, 1f)
+            Gui.func_152125_a(
+                (x + (width - iconSize) / 2 + xOffset).toInt(),
+                (y + (height - iconSize) / 2 + yOffset).toInt(),
+                0f,
+                0f,
+                textureSize,
+                textureSize,
+                iconSize,
+                iconSize,
+                textureSize.toFloat(),
+                textureSize.toFloat(),
+            )
+        } finally {
+            GL11.glColor4f(1f, 1f, 1f, 1f)
+        }
     }
 }
 
@@ -287,16 +273,19 @@ private class KeyCatcherWidget(private val onEscape: () -> Unit) : Widget<KeyCat
     override fun canHoverThrough(): Boolean = true
 }
 
-private class DownloadProgressBar(private val progress: () -> Float) : Widget<DownloadProgressBar>() {
+private class DownloadProgressBar(
+    private val style: ResourcifyStyle.Palette,
+    private val progress: () -> Float,
+) : Widget<DownloadProgressBar>() {
     override fun draw(context: ModularGuiContext, widgetTheme: WidgetThemeEntry<*>) {
         val width = getArea().width.toFloat()
         val height = getArea().height.toFloat()
         if (width <= 0f || height <= 0f) return
-        GuiDraw.drawRect(0f, 0f, width, height, 0xFF1F2328.toInt())
-        GuiDraw.drawRect(1f, 1f, width - 2f, height - 2f, 0xFF59636E.toInt())
+        GuiDraw.drawRect(0f, 0f, width, height, style.progressBackground)
+        GuiDraw.drawRect(1f, 1f, width - 2f, height - 2f, style.progressTrack)
         val filled = ((width - 2f) * progress().coerceIn(0f, 1f)).coerceAtLeast(0f)
         if (filled > 0f) {
-            GuiDraw.drawRect(1f, 1f, filled, height - 2f, 0xFF3D6DCC.toInt())
+            GuiDraw.drawRect(1f, 1f, filled, height - 2f, style.progressFill)
         }
     }
 }
@@ -334,6 +323,8 @@ private const val GALLERY_BUTTON_RIGHT_NUDGE = 3
 private const val HEADER_ACTION_BUTTON_COUNT = 2
 private const val HEADER_ACTION_BUTTONS_WIDTH =
     GALLERY_BUTTON_SIZE * HEADER_ACTION_BUTTON_COUNT + GALLERY_BUTTON_GAP * (HEADER_ACTION_BUTTON_COUNT - 1)
+private const val PAINTING_ICON_TEXTURE_SIZE = 16
+private const val PAINTING_ICON_SIZE = 20
 private const val GLOBE_ICON_TEXTURE_SIZE = 10
 private const val GLOBE_ICON_SIZE = 16
 private const val GALLERY_OVERLAY_MARGIN = 24
@@ -342,6 +333,7 @@ private const val GALLERY_ARROW_GAP = 8
 private const val DOWNLOAD_PANEL_W = 360
 private const val DOWNLOAD_PANEL_H = 286
 private const val DOWNLOAD_PANEL_PAD = 12
+private val PAINTING_TEXTURE = ResourceLocation("textures/items/painting.png")
 private val GLOBE_TEXTURE = ResourceLocation(VintageResourcify.MODID, "globe.png")
 
 // See BrowseScreen's commit 8a9f9e5 for why all state lives in the lambda
@@ -353,19 +345,21 @@ class ProjectScreen(
     sourceParent: GuiScreen?,
     platformId: String,
     initialMcVersion: String = Platform.getMcVersion(),
-) : ModularScreen(VintageResourcify.MODID, { _ ->
+) : ResourcifyScreen({ _ ->
     VintageResourcify.LOG.info("ProjectScreen lambda entry: project={}", project.getId())
-    val themeName = Config.instance.markdownTheme.lowercase()
-    val isLight = themeName == "light"
-    val descBackground = if (isLight) 0xFFF6F8FA.toInt() else 0xFF0D1117.toInt()
-    val rowBackground = if (isLight) 0x10000000 else 0x20FFFFFF
-    val accent = if (isLight) 0xFF1F2328.toInt() else 0xFFF0F6FC.toInt()
+    val style = ResourcifyStyle.palette(Config.instance.markdownTheme)
+    val descBackground = style.panel
+    val rowBackground = style.rowIdle
+    val accent = style.textPrimary
 
     val descriptionList = SimpleList()
+        .sodiumTransparent()
         .child(TextWidget(IKey.str("Loading description...")).color(accent))
     val versionsList = SimpleList()
-        .child(TextWidget(IKey.str("Loading versions...")))
+        .sodiumTransparent()
+        .child(TextWidget(IKey.str("Loading versions...")).color(accent))
     val versionFilterHolder = Container()
+        .sodiumTransparent()
     val selectedMcVersion = arrayOf<String?>(initialMcVersion)
     val allVersions = arrayOf<List<IVersion>>(emptyList())
 
@@ -546,7 +540,7 @@ class ProjectScreen(
         if (matching.isEmpty()) {
             val label = if (selected == null) "No versions available"
             else "No $selected versions available"
-            versionsList.child(TextWidget(IKey.str(label)))
+            versionsList.child(TextWidget(IKey.str(label)).color(accent))
             return
         }
         val buttonW = 56
@@ -571,11 +565,12 @@ class ProjectScreen(
             }
             val row = Flow.row()
                 .widthRel(1f).height(22).margin(0, 0, 0, 3)
-                .background(Rectangle().color(rowBackground))
+                .sodiumSurface(rowBackground)
                 .child(nameWidget)
                 .child(
                     SimpleButton()
                         .size(buttonW, 16).right(buttonRightInset).top(3)
+                        .sodiumButton(style)
                         .overlay(IKey.str("Install"))
                         .onMousePressed { btn ->
                             if (btn == 0) {
@@ -594,7 +589,7 @@ class ProjectScreen(
                 if (error != null) {
                     VintageResourcify.LOG.warn("Failed to load versions for project {}", project.getId(), error)
                     versionsList.removeAll()
-                    versionsList.child(TextWidget(IKey.str("Failed to load versions")))
+                    versionsList.child(TextWidget(IKey.str("Failed to load versions")).color(accent))
                     return@func_152344_a
                 }
                 allVersions[0] = versions
@@ -623,9 +618,10 @@ class ProjectScreen(
                 val desiredH = (mcVersions.size + 1) * 12 + 4
                 val popup = SimpleList()
                     .top(28).left(0).widthRel(1f).height(desiredH.coerceAtMost(maxPopupH))
-                    .background(Rectangle().color(0xFF1F2328.toInt()))
+                    .sodiumSurface(style.popup)
                 popup.setEnabled(false)
                 val button = SimpleButton().widthRel(1f).height(14).top(12).left(0)
+                    .sodiumButton(style)
                 button.overlay(IKey.dynamic {
                     val label = selectedMcVersion[0] ?: "Any version"
                     "$label  v"
@@ -645,6 +641,7 @@ class ProjectScreen(
                 mcVersions.forEach { options.add(it to it) }
                 for ((id, name) in options) {
                     val opt = SimpleButton().widthRel(1f).height(12)
+                        .sodiumSelectorItem(style) { selectedMcVersion[0] == id }
                     opt.overlay(IKey.dynamic {
                         if (selectedMcVersion[0] == id) "§f§l$name§r" else "§7$name§r"
                     })
@@ -694,7 +691,7 @@ class ProjectScreen(
     val iconSize = 40
     val projectIcon = AsyncIcon(project.getIconUrl(), iconSize).top(GUTTER).left(GUTTER)
     val textLeft = GUTTER + iconSize + 8
-    val authorInfoColor = 0xFF3D444D.toInt()
+    val authorInfoColor = style.textSecondary
     val authorText = "by ${project.getAuthor()}  •  ${project.getDownloads().formatCompact()} downloads"
     val font = Minecraft.getMinecraft().fontRenderer
     val defaultGalleryButtonLeft = GUTTER + descListW + GALLERY_BUTTON_GAP + GALLERY_BUTTON_RIGHT_NUDGE
@@ -712,6 +709,7 @@ class ProjectScreen(
     }
     val header = TextWidget(IKey.str(project.getName()).style(EnumChatFormatting.BOLD).scale(1.5f))
         .top(GUTTER).left(textLeft)
+        .color(accent)
     val authorLine = TextWidget(IKey.str(displayedAuthorText))
         .top(GUTTER + 16).left(textLeft).width(authorLineWidth).height(12)
         .color(authorInfoColor)
@@ -720,6 +718,7 @@ class ProjectScreen(
     val summaryWidth = (galleryButtonLeft - textLeft - GALLERY_BUTTON_GAP).coerceAtLeast(20)
     val summaryList = SimpleList()
         .top(GUTTER + 28).left(textLeft).width(summaryWidth).height(28)
+        .sodiumTransparent()
         .child(
             TextWidget(IKey.str(project.getSummary()))
                 .widthRel(1f)
@@ -730,7 +729,7 @@ class ProjectScreen(
     val bodyTop = GUTTER + 64
     descriptionList
         .top(bodyTop).left(GUTTER).width(descListW).bottom(GUTTER)
-        .background(Rectangle().color(descBackground))
+        .sodiumSurface(descBackground)
         .padding(DESC_PAD, DESC_PAD, DESC_PAD, DESC_PAD)
 
     val galleryMessage = arrayOf<String?>(null)
@@ -805,9 +804,10 @@ class ProjectScreen(
 
     galleryOverlay = Container()
         .top(0).left(0).width(sr0.scaledWidth).height(sr0.scaledHeight)
+        .sodiumTransparent()
     val galleryBackdrop = SimpleButton()
         .top(0).left(0).width(sr0.scaledWidth).height(sr0.scaledHeight)
-        .background(Rectangle().color(0xAA000000.toInt()))
+        .sodiumSurface(style.overlayScrimStrong)
         .disableHoverThemeBackground(true)
         .playClickSound(false)
         .onKeyPressed { _, keyCode ->
@@ -836,6 +836,7 @@ class ProjectScreen(
         .top(sr0.scaledHeight / 2 - GALLERY_ARROW_SIZE / 2)
         .left(GALLERY_OVERLAY_MARGIN)
         .size(GALLERY_ARROW_SIZE, GALLERY_ARROW_SIZE)
+        .sodiumIconButton(style)
         .disableThemeBackground(true)
         .disableHoverThemeBackground(true)
         .overlay(ResourcePackArrowDrawable(ResourcePackArrowDrawable.Direction.LEFT, false))
@@ -846,6 +847,7 @@ class ProjectScreen(
         .top(sr0.scaledHeight / 2 - GALLERY_ARROW_SIZE / 2)
         .left(sr0.scaledWidth - GALLERY_OVERLAY_MARGIN - GALLERY_ARROW_SIZE)
         .size(GALLERY_ARROW_SIZE, GALLERY_ARROW_SIZE)
+        .sodiumIconButton(style)
         .disableThemeBackground(true)
         .disableHoverThemeBackground(true)
         .overlay(ResourcePackArrowDrawable(ResourcePackArrowDrawable.Direction.RIGHT, false))
@@ -860,7 +862,7 @@ class ProjectScreen(
         .child(galleryRight)
     galleryOverlay.setEnabled(false)
 
-    val downloadPanelBg = if (isLight) 0xFFF0F2F4.toInt() else 0xFF1F2328.toInt()
+    val downloadPanelBg = style.panelRaised
     val downloadButtonTop = downloadPanelTop + downloadPanelH - 28
     val downloadProgressTop = downloadButtonTop - 16
     val downloadStatusTop = downloadProgressTop - 12
@@ -869,7 +871,7 @@ class ProjectScreen(
     val downloadInnerLeft = downloadPanelLeft + DOWNLOAD_PANEL_PAD
     val downloadBackdrop = SimpleButton()
         .top(0).left(0).width(sr0.scaledWidth).height(sr0.scaledHeight)
-        .background(Rectangle().color(0x66000000))
+        .sodiumSurface(style.overlayScrim)
         .disableHoverThemeBackground(true)
         .playClickSound(false)
         .onMousePressed { btn ->
@@ -880,16 +882,16 @@ class ProjectScreen(
         }
     val downloadPanelBackground = SimpleButton()
         .top(downloadPanelTop).left(downloadPanelLeft).width(downloadPanelW).height(downloadPanelH)
-        .background(Rectangle().color(downloadPanelBg))
+        .sodiumSurface(downloadPanelBg)
         .disableHoverThemeBackground(true)
         .playClickSound(false)
         .onMousePressed { btn -> btn == 0 || btn == 1 }
     downloadChangelogList = SimpleList()
         .top(downloadChangelogTop).left(downloadInnerLeft)
         .width(downloadTextW).height(downloadChangelogH)
-        .background(Rectangle().color(descBackground))
+        .sodiumSurface(descBackground)
         .padding(4, 4, 4, 4)
-    val downloadProgress = DownloadProgressBar(::currentDownloadProgress)
+    val downloadProgress = DownloadProgressBar(style, ::currentDownloadProgress)
         .top(downloadProgressTop).left(downloadInnerLeft)
         .width(downloadTextW).height(8)
     progressBarHolder[0] = downloadProgress
@@ -904,6 +906,7 @@ class ProjectScreen(
     val closeDownloadButton = SimpleButton()
         .top(downloadButtonTop).left(downloadInnerLeft)
         .size(50, 16)
+        .sodiumButton(style)
         .overlay(IKey.str("Close"))
         .onMousePressed { btn ->
             if (btn == 0) {
@@ -915,6 +918,7 @@ class ProjectScreen(
     val startDownloadButton = SimpleButton()
         .top(downloadButtonTop).left(downloadPanelLeft + downloadPanelW - DOWNLOAD_PANEL_PAD - 80)
         .size(80, 16)
+        .sodiumButton(style)
         .overlay(IKey.dynamic {
             if (downloadState[0] == DownloadPanelState.FAILED ||
                 downloadState[0] == DownloadPanelState.CANCELLED
@@ -930,6 +934,7 @@ class ProjectScreen(
     val cancelDownloadButton = SimpleButton()
         .top(downloadButtonTop).left(downloadPanelLeft + downloadPanelW - DOWNLOAD_PANEL_PAD - 80)
         .size(80, 16)
+        .sodiumButton(style)
         .overlay(IKey.str("Cancel"))
         .onMousePressed { btn ->
             if (btn == 0) {
@@ -941,12 +946,14 @@ class ProjectScreen(
     val enableDownloadButton = SimpleButton()
         .top(downloadButtonTop).left(downloadInnerLeft + 56)
         .size(64, 16)
+        .sodiumButton(style)
         .overlay(IKey.str("Enable"))
         .onMousePressed { btn -> if (btn == 0) enableDownloaded() else false }
     enableButtonHolder[0] = enableDownloadButton
     val manageDownloadButton = SimpleButton()
         .top(downloadButtonTop).left(downloadPanelLeft + downloadPanelW - DOWNLOAD_PANEL_PAD - 128)
         .size(128, 16)
+        .sodiumButton(style)
         .overlay(IKey.str(manageScreenLabel))
         .onMousePressed { btn -> if (btn == 0) openManageScreen() else false }
     manageButtonHolder[0] = manageDownloadButton
@@ -1018,7 +1025,17 @@ class ProjectScreen(
         .top(GUTTER + 16)
         .left(galleryButtonLeft)
         .size(GALLERY_BUTTON_SIZE, GALLERY_BUTTON_SIZE)
-        .overlay(CenteredItemDrawable(ItemStack(Items.painting), 20, xOffset = -0.5f))
+        .sodiumIconButton(style)
+        .overlay(CenteredTextureDrawable(PAINTING_TEXTURE, PAINTING_ICON_TEXTURE_SIZE, PAINTING_ICON_SIZE, xOffset = -0.5f))
+        .hoverOverlay(
+            CenteredTextureDrawable(
+                PAINTING_TEXTURE,
+                PAINTING_ICON_TEXTURE_SIZE,
+                PAINTING_ICON_SIZE,
+                xOffset = -0.5f,
+                darkened = true,
+            )
+        )
         .onMousePressed { btn ->
             if (btn == 0) {
                 openGallery()
@@ -1031,7 +1048,9 @@ class ProjectScreen(
         .top(GUTTER + 16)
         .left(globeButtonLeft)
         .size(GALLERY_BUTTON_SIZE, GALLERY_BUTTON_SIZE)
+        .sodiumIconButton(style)
         .overlay(CenteredTextureDrawable(GLOBE_TEXTURE, GLOBE_ICON_TEXTURE_SIZE, GLOBE_ICON_SIZE))
+        .hoverOverlay(CenteredTextureDrawable(GLOBE_TEXTURE, GLOBE_ICON_TEXTURE_SIZE, GLOBE_ICON_SIZE, darkened = true))
         .onMousePressed { btn ->
             if (btn == 0) {
                 UrlOpener.openLinkPrompted(project.getBrowserUrl(), Minecraft.getMinecraft().currentScreen)
@@ -1056,6 +1075,7 @@ class ProjectScreen(
 
     val versionsHeader = TextWidget(IKey.str("Versions").style(EnumChatFormatting.BOLD))
         .top(bodyTop).left(verColLeft).width(verColW).height(14)
+        .color(accent)
         .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
     // The dropdown's open popup paints from inside the holder; reserve a
     // 32px-tall slot (label + button) before the version list, then push the
@@ -1064,6 +1084,7 @@ class ProjectScreen(
         .top(bodyTop + 18).left(verColLeft).width(verColW).height(28)
     versionsList
         .top(bodyTop + 50).left(verColLeft).width(verColW).bottom(GUTTER)
+        .sodiumTransparent()
 
     loadVersions()
     loadDescription()
@@ -1074,6 +1095,7 @@ class ProjectScreen(
     )
     ModularPanel.defaultPanel("vintage-resourcify-project")
         .full()
+        .sodiumSurface(style.screenScrim)
         .child(projectIcon)
         .child(header)
         .child(authorLine)

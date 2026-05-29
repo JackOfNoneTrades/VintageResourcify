@@ -19,10 +19,8 @@ package dev.dediamondpro.resourcify.gui.browsepage
 
 import com.cleanroommc.modularui.api.drawable.IKey
 import com.cleanroommc.modularui.api.widget.IWidget
-import com.cleanroommc.modularui.drawable.Rectangle
 import com.cleanroommc.modularui.factory.ClientGUI
 import com.cleanroommc.modularui.screen.ModularPanel
-import com.cleanroommc.modularui.screen.ModularScreen
 import com.cleanroommc.modularui.widgets.ButtonWidget
 import com.cleanroommc.modularui.widgets.ListWidget
 import com.cleanroommc.modularui.widgets.TextWidget
@@ -35,8 +33,15 @@ import dev.dediamondpro.resourcify.gui.CloseButtonDrawable
 import dev.dediamondpro.resourcify.gui.CLOSE_BUTTON_RIGHT
 import dev.dediamondpro.resourcify.gui.CLOSE_BUTTON_SIZE
 import dev.dediamondpro.resourcify.gui.CLOSE_BUTTON_TOP
+import dev.dediamondpro.resourcify.gui.ResourcifyStyle
+import dev.dediamondpro.resourcify.gui.ResourcifyScreen
 import dev.dediamondpro.resourcify.gui.closeLikeEscape
 import dev.dediamondpro.resourcify.gui.projectpage.ProjectScreen
+import dev.dediamondpro.resourcify.gui.sodiumButton
+import dev.dediamondpro.resourcify.gui.sodiumSelectorItem
+import dev.dediamondpro.resourcify.gui.sodiumSurface
+import dev.dediamondpro.resourcify.gui.sodiumTextField
+import dev.dediamondpro.resourcify.gui.sodiumTransparent
 import dev.dediamondpro.resourcify.platform.Platform
 import dev.dediamondpro.resourcify.services.IProject
 import dev.dediamondpro.resourcify.services.ProjectType
@@ -69,7 +74,7 @@ class BrowseScreen(
     initialType: ProjectType,
     initialFolder: File,
     sourceParent: GuiScreen?,
-) : ModularScreen(VintageResourcify.MODID, { _ ->
+) : ResourcifyScreen({ _ ->
     // Type, service, sort and folder are all "var" because the user can flip
     // between resource packs and shaders via the top tab row without leaving
     // the screen. Cards capture the current type/folder at construction time;
@@ -79,11 +84,7 @@ class BrowseScreen(
     var defaultSortKey = service.getSortOptions().keys.firstOrNull() ?: ""
     var packsFolder = initialFolder
 
-    val isLight = Config.instance.markdownTheme.equals("light", ignoreCase = true)
-    val cardBg = if (isLight) 0x14000000 else 0x28FFFFFF
-    val textPrimary = if (isLight) 0xFF1F2328.toInt() else 0xFFF0F6FC.toInt()
-    val textSecondary = if (isLight) 0xFF59636E.toInt() else 0xFF9198A1.toInt()
-    val textSecondaryHover = if (isLight) 0xFF0B1F33.toInt() else 0xFFEAF2FF.toInt()
+    val style = ResourcifyStyle.palette(Config.instance.markdownTheme)
 
     var triggerSearch: (() -> Unit)? = null
     val searchBox = object : TextFieldWidget() {
@@ -94,7 +95,7 @@ class BrowseScreen(
             }
             return super.onKeyPressed(character, keyCode)
         }
-    }
+    }.sodiumTextField(style).hintText("Search...")
     val resultsList = SimpleList()
     val filtersList = SimpleList()
     // Holds the "Filters" + "Minecraft version" labels and the actual
@@ -147,11 +148,11 @@ class BrowseScreen(
             // change, Enter, button, type switch, initial load).
             lastObservedText = currentQuery
             lastKeystrokeMs = -1L
-            resultsList.child(TextWidget(IKey.str("Searching...")).color(textSecondary))
+            resultsList.child(TextWidget(IKey.str("Searching...")).color(style.textSecondary))
         } else {
             loadMoreBtn?.let { resultsList.remove(it) }
             loadMoreBtn = null
-            val loadingMore = TextWidget(IKey.str("Loading more...")).color(textSecondary)
+            val loadingMore = TextWidget(IKey.str("Loading more...")).color(style.textSecondary)
             resultsList.child(loadingMore)
             loadMoreBtn = loadingMore
         }
@@ -181,13 +182,13 @@ class BrowseScreen(
                 val projects: List<IProject> = result?.projects ?: emptyList()
                 totalCount = result?.totalCount ?: loadedCount
                 if (loadedCount == 0 && projects.isEmpty()) {
-                    resultsList.child(TextWidget(IKey.str("No results")).color(textSecondary))
+                    resultsList.child(TextWidget(IKey.str("No results")).color(style.textSecondary))
                     return@func_152344_a
                 }
                 val platformIdAtRequest = service.getPlatformId()
                 val mcVersionAtRequest = mcVersionsAtRequest.firstOrNull() ?: Platform.getMcVersion()
                 projects.forEach { project ->
-                    resultsList.child(buildCard(project, typeAtRequest, folderAtRequest, sourceParent, platformIdAtRequest, mcVersionAtRequest, cardBg, textPrimary, textSecondary, textSecondaryHover))
+                    resultsList.child(buildCard(project, typeAtRequest, folderAtRequest, sourceParent, platformIdAtRequest, mcVersionAtRequest, style))
                 }
                 loadedCount += projects.size
                 if (loadedCount < totalCount && projects.isNotEmpty()) {
@@ -198,6 +199,7 @@ class BrowseScreen(
                         // edge-to-edge overlay and would otherwise paint
                         // under the scrollbar track.
                         .left(0).right(10).height(20).margin(0, 0, 0, CARD_GAP)
+                        .sodiumButton(style)
                         .overlay(IKey.str("Load more (${loadedCount}/${totalCount})"))
                         .onMousePressed { b -> if (b == 0) { loadPage(append = true); true } else false }
                     resultsList.child(btn)
@@ -212,7 +214,9 @@ class BrowseScreen(
     // that "Resource Packs" fits on a single line at default font scale.
     val shadersAvailable = ShaderGuiHelper.isPresent()
     val packsTab = SimpleButton().size(112, 18)
+        .sodiumButton(style) { currentType == ProjectType.RESOURCE_PACK }
     val shadersTab = SimpleButton().size(112, 18)
+        .sodiumButton(style) { currentType == ProjectType.IRIS_SHADER }
 
     fun tabLabel(label: String, selected: Boolean): String =
         if (selected) "§f§n$label§r" else "§7$label§r"
@@ -236,6 +240,7 @@ class BrowseScreen(
         // Right margin clears the filtersList scrollbar (~6px); without it,
         // the pill's right edge paints under the scroll track.
         val btn = SimpleButton().left(0).right(7).height(12).margin(0, 0, 1, 1)
+            .sodiumButton(style, isSelected)
         btn.overlay(IKey.dynamic {
             val resolved = dev.dediamondpro.resourcify.util.localizeOrDefault(displayName, displayName)
             if (isSelected()) "§f§l$resolved§r" else "§7$resolved§r"
@@ -254,21 +259,22 @@ class BrowseScreen(
         filtersList.removeAll()
         versionDropdownHolder.removeAll()
         versionDropdownHolder.child(
-            TextWidget(IKey.str("§lFilters§r")).color(textPrimary).top(0).left(0).widthRel(1f).height(10)
+            TextWidget(IKey.str("§lFilters§r")).color(style.textPrimary).top(0).left(0).widthRel(1f).height(10)
         )
 
         // Platform dropdown: same shape as the MC-version one below. Picking
         // a new platform throws away the current filter state (its categories
         // and sort keys are platform-specific) and reloads.
         versionDropdownHolder.child(
-            TextWidget(IKey.str("§lPlatform§r")).color(textPrimary).top(12).left(0).widthRel(1f).height(10)
+            TextWidget(IKey.str("§lPlatform§r")).color(style.textPrimary).top(12).left(0).widthRel(1f).height(10)
         )
         val availableServices = ServiceRegistry.getServices(currentType)
         val platformPopup = SimpleList()
             .top(40).left(0).widthRel(1f).height(availableServices.size * 12 + 4)
-            .background(com.cleanroommc.modularui.drawable.Rectangle().color(0xFF1F2328.toInt()))
+            .sodiumSurface(style.popup)
         platformPopup.setEnabled(false)
         val platformButton = SimpleButton().widthRel(1f).height(14).top(24).left(0)
+            .sodiumButton(style)
         platformButton.overlay(IKey.dynamic { "${service.getName()}  v" })
         platformButton.onMousePressed { b ->
             if (b == 0) {
@@ -282,6 +288,7 @@ class BrowseScreen(
         }
         for (svc in availableServices) {
             val opt = SimpleButton().widthRel(1f).height(12)
+                .sodiumSelectorItem(style) { svc === service }
             opt.overlay(IKey.dynamic {
                 val n = svc.getName()
                 if (svc === service) "§f§l$n§r" else "§7$n§r"
@@ -314,7 +321,7 @@ class BrowseScreen(
         versionDropdownHolder.child(platformPopup)
 
         versionDropdownHolder.child(
-            TextWidget(IKey.str("§lMinecraft version§r")).color(textPrimary).top(42).left(0).widthRel(1f).height(10)
+            TextWidget(IKey.str("§lMinecraft version§r")).color(style.textPrimary).top(42).left(0).widthRel(1f).height(10)
         )
 
         // Custom dropdown: a label button + a hidden ListWidget popup. We
@@ -323,7 +330,7 @@ class BrowseScreen(
         // with null scroll data and never gains real scroll behaviour, so
         // any version list past ~10 entries simply gets clipped. ListWidget
         // does initialise scroll data in onInit, so this popup scrolls.
-        val versionPlaceholder = TextWidget(IKey.str("§7Loading versions...§r")).color(textSecondary)
+        val versionPlaceholder = TextWidget(IKey.str("§7Loading versions...§r")).color(style.textSecondary)
             .top(54).left(0).widthRel(1f).height(14)
         versionDropdownHolder.child(versionPlaceholder)
         val typeAtVersions = currentType
@@ -344,9 +351,10 @@ class BrowseScreen(
                 val selectedId = arrayOf(preselected ?: if (ordered.containsKey(mcv)) mcv else ordered.keys.first())
                 val popup = SimpleList()
                     .top(70).left(0).widthRel(1f).height(135)
-                    .background(com.cleanroommc.modularui.drawable.Rectangle().color(0xFF1F2328.toInt()))
+                    .sodiumSurface(style.popup)
                 popup.setEnabled(false)
                 val button = SimpleButton().widthRel(1f).height(14).top(54).left(0)
+                    .sodiumButton(style)
                 button.overlay(IKey.dynamic { "${ordered[selectedId[0]] ?: selectedId[0]}  v" })
                 button.onMousePressed { b ->
                     if (b == 0) {
@@ -360,6 +368,7 @@ class BrowseScreen(
                 }
                 for ((id, name) in ordered) {
                     val opt = SimpleButton().widthRel(1f).height(12)
+                        .sodiumSelectorItem(style) { selectedId[0] == id }
                     opt.overlay(IKey.dynamic { if (selectedId[0] == id) "§f§l$name§r" else "§7$name§r" })
                     opt.onMousePressed { b ->
                         if (b == 0) {
@@ -396,7 +405,7 @@ class BrowseScreen(
         // Sort group: synchronous list from the service.
         val sortOptions = service.getSortOptions()
         if (sortOptions.isNotEmpty()) {
-            filtersList.child(TextWidget(IKey.str("§lSort by§r")).color(textPrimary).margin(0, 2, 0, 2))
+            filtersList.child(TextWidget(IKey.str("§lSort by§r")).color(style.textPrimary).margin(0, 2, 0, 2))
             for ((id, label) in sortOptions) {
                 sortNames[id] = label
                 val pill = filterPill(id, label, { id == currentSort }) { currentSort = id }
@@ -406,7 +415,7 @@ class BrowseScreen(
 
         // Categories: async because services may need a network round-trip
         // (Modrinth caches the tag dump). Show a loading line until ready.
-        val loadingMarker = TextWidget(IKey.str("§7Loading categories...§r")).color(textSecondary).margin(0, 4, 0, 2)
+        val loadingMarker = TextWidget(IKey.str("§7Loading categories...§r")).color(style.textSecondary).margin(0, 4, 0, 2)
         filtersList.child(loadingMarker)
         val typeAtRequest = currentType
         val serviceAtRequest = service
@@ -415,13 +424,13 @@ class BrowseScreen(
                 if (typeAtRequest != currentType || serviceAtRequest !== service) return@func_152344_a
                 filtersList.remove(loadingMarker)
                 if (groups.isEmpty()) {
-                    filtersList.child(TextWidget(IKey.str("§7(no categories)§r")).color(textSecondary))
+                    filtersList.child(TextWidget(IKey.str("§7(no categories)§r")).color(style.textSecondary))
                     return@func_152344_a
                 }
                 for ((groupName, members) in groups) {
                     if (members.isEmpty()) continue
                     val header = TextWidget(IKey.str("§l${groupName.replaceFirstChar { it.uppercase() }}§r"))
-                        .color(textPrimary).margin(0, 6, 0, 2)
+                        .color(style.textPrimary).margin(0, 6, 0, 2)
                     filtersList.child(header)
                     for ((id, displayName) in members) {
                         categoryNames[id] = displayName
@@ -465,6 +474,7 @@ class BrowseScreen(
     shadersTab.onMousePressed { b -> if (b == 0) { switchType(ProjectType.IRIS_SHADER); true } else false }
 
     val tabRow = Flow.row().top(6).left(10).height(18)
+        .sodiumTransparent()
         .child(packsTab.margin(0, 4, 0, 0))
         .apply { if (shadersAvailable) child(shadersTab) }
 
@@ -485,6 +495,7 @@ class BrowseScreen(
     // Search fires automatically on idle via the tick-driven debounce below;
     // Enter still triggers an immediate search through searchBox's key handler.
     val searchRow = Flow.row().top(28).left(10).right(10).height(16)
+        .sodiumTransparent()
         .child(searchBox.heightRel(1f).widthRel(1f))
 
     triggerSearch = { loadPage(append = false) }
@@ -510,14 +521,18 @@ class BrowseScreen(
     // by keeping it OUTSIDE the scrollable filtersList we avoid scroll-
     // viewport clipping. filtersList starts below it.
     versionDropdownHolder.top(50).left(10).width(120).height(72)
+        .sodiumTransparent()
     filtersList.top(124).left(10).width(120).bottom(10)
+        .sodiumTransparent()
     resultsList.top(50).left(140).right(10).bottom(10)
-        .child(TextWidget(IKey.str("Loading...")).color(textSecondary))
+        .sodiumTransparent()
+        .child(TextWidget(IKey.str("Loading...")).color(style.textSecondary))
     rebuildFilters()
     loadPage(append = false)
 
     ModularPanel.defaultPanel("vintage-resourcify-browse")
         .full()
+        .sodiumSurface(style.screenScrim)
         .child(tabRow)
         .child(searchRow)
         .child(filtersList)
@@ -536,10 +551,7 @@ private fun buildCard(
     sourceParent: GuiScreen?,
     platformId: String,
     initialMcVersion: String,
-    cardBg: Int,
-    textPrimary: Int,
-    textSecondary: Int,
-    textSecondaryHover: Int,
+    style: ResourcifyStyle.Palette,
 ): IWidget {
     val card = SimpleButton()
     val click = { btn: Int ->
@@ -653,6 +665,7 @@ private fun buildCard(
     val textTop = (CARD_HEIGHT - textBlockH) / 2
     val content = Container()
         .widthRel(1f).heightRel(1f)
+        .sodiumTransparent()
         .child(
             AsyncIcon(project.getIconUrl(), ICON_SIZE)
                 .top(iconTop).left(INNER_PAD)
@@ -660,25 +673,26 @@ private fun buildCard(
         .child(
             TextWidget(IKey.str(title).style(EnumChatFormatting.BOLD))
                 .top(textTop).left(textLeft).right(INNER_PAD).height(10)
-                .color(textPrimary)
+                .color(style.textPrimary)
                 .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
         )
         .child(
             TextWidget(IKey.str(authorLine))
                 .top(textTop + 11).left(textLeft).right(INNER_PAD).height(9)
-                .color { if (card.isHovering) textSecondaryHover else textSecondary }
+                .color { if (card.isHovering) style.textSecondaryHover else style.textSecondary }
                 .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
         )
         .child(
             TextWidget(IKey.str(summary))
                 .top(textTop + 22).left(textLeft).right(INNER_PAD).height(textBlockH - 22)
-                .color(textPrimary)
+                .color(style.textPrimary)
                 .alignment(com.cleanroommc.modularui.utils.Alignment.TopLeft)
         )
 
     return card
         .widthRel(1f).height(CARD_HEIGHT).margin(0, 0, 0, CARD_GAP)
-        .background(Rectangle().color(cardBg))
+        .background(ResourcifyStyle.dynamicRect { if (card.isHovering) style.rowHover else style.rowIdle })
+        .disableHoverThemeBackground(true)
         .overlay()
         .child(content)
         .onMousePressed(click)
