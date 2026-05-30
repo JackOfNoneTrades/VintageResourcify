@@ -1119,7 +1119,7 @@ class ProjectScreen(
         .hoverOverlay(CloseButtonDrawable(true))
         .onMousePressed { btn ->
             if (btn == 0) {
-                closeLikeEscape()
+                closeLikeEscape("project-close-button:${project.getId()}")
                 true
             } else false
         }

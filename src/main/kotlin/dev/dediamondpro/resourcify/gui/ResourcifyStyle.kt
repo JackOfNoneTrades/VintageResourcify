@@ -137,7 +137,7 @@ open class ResourcifyScreen(
             return true
         }
 
-        closeLikeEscape()
+        closeLikeEscape("escape:$name")
         return true
     }
 

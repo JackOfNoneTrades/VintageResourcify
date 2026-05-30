@@ -5,6 +5,7 @@ import com.cleanroommc.modularui.screen.ModularScreen
 import com.cleanroommc.modularui.screen.viewport.GuiContext
 import com.cleanroommc.modularui.theme.WidgetTheme
 import dev.dediamondpro.resourcify.VintageResourcify
+import dev.dediamondpro.resourcify.util.ClientGuiTasks
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Gui
 import net.minecraft.util.ResourceLocation
@@ -41,11 +42,27 @@ class CloseButtonDrawable(private val hovered: Boolean) : IDrawable {
     }
 }
 
-fun closeLikeEscape() {
+fun closeLikeEscape(reason: String = "unspecified") {
     val screen = ModularScreen.getCurrent() ?: return
-    val panelManager = screen.panelManager
-    if (panelManager.isMainPanel(panelManager.topMostPanel)) {
-        screen.openParentOnClose(true)
+    val mcScreen = Minecraft.getMinecraft().currentScreen
+
+    ClientGuiTasks.runNextClientTick {
+        if (Minecraft.getMinecraft().currentScreen !== mcScreen || ModularScreen.getCurrent() !== screen) {
+            return@runNextClientTick
+        }
+        closeLikeEscapeNow(reason, screen)
     }
-    panelManager.closeTopPanel()
+}
+
+private fun closeLikeEscapeNow(reason: String, screen: ModularScreen) {
+    try {
+        val panelManager = screen.panelManager
+        val topPanel = panelManager.topMostPanel
+        if (panelManager.isMainPanel(topPanel)) {
+            screen.openParentOnClose(true)
+        }
+        panelManager.closeTopPanel()
+    } catch (t: Throwable) {
+        VintageResourcify.LOG.error("Failed to close Resourcify screen ({})", reason, t)
+    }
 }

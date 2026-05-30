@@ -491,7 +491,7 @@ class BrowseScreen(
         .hoverOverlay(CloseButtonDrawable(true))
         .onMousePressed { b ->
             if (b == 0) {
-                closeLikeEscape()
+                closeLikeEscape("browse-close-button")
                 true
             } else false
         }
