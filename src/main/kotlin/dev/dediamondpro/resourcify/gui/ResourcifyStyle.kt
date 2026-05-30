@@ -5,6 +5,7 @@ import com.cleanroommc.modularui.api.widget.IWidget
 import com.cleanroommc.modularui.drawable.Rectangle
 import com.cleanroommc.modularui.screen.ModularPanel
 import com.cleanroommc.modularui.screen.ModularScreen
+import com.cleanroommc.modularui.screen.RichTooltipEvent
 import com.cleanroommc.modularui.screen.viewport.GuiContext
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext
 import com.cleanroommc.modularui.theme.WidgetTheme
@@ -14,6 +15,7 @@ import com.cleanroommc.modularui.widget.Widget
 import com.cleanroommc.modularui.widgets.ButtonWidget
 import com.cleanroommc.modularui.widgets.ListWidget
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget
+import cpw.mods.fml.common.eventhandler.SubscribeEvent
 import dev.dediamondpro.resourcify.VintageResourcify
 import net.minecraft.client.gui.Gui
 import org.lwjgl.input.Keyboard
@@ -109,6 +111,17 @@ object ResourcifyStyle {
 
     private fun ensureAlpha(color: Int): Int {
         return if (color and 0xFF000000.toInt() == 0) color or 0xFF000000.toInt() else color
+    }
+}
+
+object ResourcifyTooltipStyle {
+    private const val TOOLTIP_BACKGROUND = -0x1000000
+
+    @SubscribeEvent
+    fun onTooltipColor(event: RichTooltipEvent.Color) {
+        event.background = TOOLTIP_BACKGROUND
+        event.borderStart = TOOLTIP_BACKGROUND
+        event.borderEnd = TOOLTIP_BACKGROUND
     }
 }
 
