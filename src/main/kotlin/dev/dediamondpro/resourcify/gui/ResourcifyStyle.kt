@@ -1,14 +1,17 @@
 package dev.dediamondpro.resourcify.gui
 
 import com.cleanroommc.modularui.api.drawable.IDrawable
+import com.cleanroommc.modularui.api.widget.IWidget
 import com.cleanroommc.modularui.drawable.Rectangle
 import com.cleanroommc.modularui.screen.ModularPanel
 import com.cleanroommc.modularui.screen.ModularScreen
 import com.cleanroommc.modularui.screen.viewport.GuiContext
 import com.cleanroommc.modularui.screen.viewport.ModularGuiContext
 import com.cleanroommc.modularui.theme.WidgetTheme
+import com.cleanroommc.modularui.widget.scroll.VerticalScrollData
 import com.cleanroommc.modularui.widget.Widget
 import com.cleanroommc.modularui.widgets.ButtonWidget
+import com.cleanroommc.modularui.widgets.ListWidget
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget
 import dev.dediamondpro.resourcify.VintageResourcify
 import net.minecraft.client.gui.Gui
@@ -26,6 +29,9 @@ import java.util.function.Function
 object ResourcifyStyle {
     const val SELECTOR_ITEM_IDLE = -0x1000000
     const val SELECTOR_ITEM_HOVER = -0x00E6E6E6
+    const val SODIUM_SCROLLBAR_WIDTH = 7
+    const val SODIUM_SCROLLBAR_TRACK = 0x96323232.toInt()
+    const val SODIUM_SCROLLBAR_THUMB = 0x96646464.toInt()
 
     data class Palette(
         val accent: Int,
@@ -135,6 +141,16 @@ fun <W : Widget<W>> W.sodiumTransparent(): W {
 fun <W : Widget<W>> W.sodiumSurface(color: Int): W {
     return background(ResourcifyStyle.rect(color))
         .disableHoverThemeBackground(true)
+}
+
+fun <I : IWidget, W : ListWidget<I, W>> W.sodiumScrollbars(): W {
+    scrollDirection(
+        VerticalScrollData(false, ResourcifyStyle.SODIUM_SCROLLBAR_WIDTH)
+            .apply { texture(ResourcifyStyle.rect(ResourcifyStyle.SODIUM_SCROLLBAR_THUMB)) }
+    )
+    scrollArea.scrollBarBackgroundColor = ResourcifyStyle.SODIUM_SCROLLBAR_TRACK
+    showScrollShadows(false)
+    return this
 }
 
 fun <W : ButtonWidget<W>> W.sodiumButton(palette: ResourcifyStyle.Palette): W {

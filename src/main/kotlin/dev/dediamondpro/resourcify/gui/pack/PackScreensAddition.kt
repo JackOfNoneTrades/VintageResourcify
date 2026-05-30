@@ -20,6 +20,7 @@ package dev.dediamondpro.resourcify.gui.pack
 import com.cleanroommc.modularui.factory.ClientGUI
 import dev.dediamondpro.resourcify.VintageResourcify
 import dev.dediamondpro.resourcify.config.Config
+import dev.dediamondpro.resourcify.gui.ResourcifyStyle
 import dev.dediamondpro.resourcify.gui.browsepage.BrowseScreen
 import dev.dediamondpro.resourcify.mixins.early.minecraft.PackScreenAccessor
 import dev.dediamondpro.resourcify.platform.Platform
@@ -836,11 +837,12 @@ object PackScreensAddition {
 
     private fun drawScrollBar(x: Int, y: Int, width: Int, height: Int, rowCount: Int, maxScroll: Int) {
         if (maxScroll <= 0 || rowCount <= 0) return
-        val barX = x + width - 5
+        val barW = ResourcifyStyle.SODIUM_SCROLLBAR_WIDTH
+        val barX = x + width - barW
         val thumbH = (height * (height / ROW_HEIGHT).toFloat() / rowCount.toFloat()).toInt().coerceIn(18, height)
         val thumbY = y + ((height - thumbH) * (updateScroll.toFloat() / maxScroll.toFloat())).toInt()
-        Gui.drawRect(barX, y, barX + 4, y + height, 0x33000000)
-        Gui.drawRect(barX, thumbY, barX + 4, thumbY + thumbH, 0xAA505050.toInt())
+        Gui.drawRect(barX, y, barX + barW, y + height, ResourcifyStyle.SODIUM_SCROLLBAR_TRACK)
+        Gui.drawRect(barX, thumbY, barX + barW, thumbY + thumbH, ResourcifyStyle.SODIUM_SCROLLBAR_THUMB)
     }
 
     private fun beginScissor(x: Int, y: Int, width: Int, height: Int, screen: GuiScreen) {

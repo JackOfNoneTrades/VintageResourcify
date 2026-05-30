@@ -38,6 +38,7 @@ import dev.dediamondpro.resourcify.gui.ResourcifyScreen
 import dev.dediamondpro.resourcify.gui.closeLikeEscape
 import dev.dediamondpro.resourcify.gui.projectpage.ProjectScreen
 import dev.dediamondpro.resourcify.gui.sodiumButton
+import dev.dediamondpro.resourcify.gui.sodiumScrollbars
 import dev.dediamondpro.resourcify.gui.sodiumSelectorItem
 import dev.dediamondpro.resourcify.gui.sodiumSurface
 import dev.dediamondpro.resourcify.gui.sodiumTextField
@@ -60,7 +61,11 @@ import java.io.File
 
 // F-bounded self-types in Kotlin need a concrete subclass.
 private class SimpleButton : ButtonWidget<SimpleButton>()
-private class SimpleList : ListWidget<IWidget, SimpleList>()
+private class SimpleList : ListWidget<IWidget, SimpleList>() {
+    init {
+        sodiumScrollbars()
+    }
+}
 private class Container : ParentWidget<Container>()
 
 // Card layout constants. Sized so a 1080p window shows 6-7 cards above the

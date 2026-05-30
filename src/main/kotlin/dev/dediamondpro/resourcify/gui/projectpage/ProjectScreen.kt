@@ -44,6 +44,7 @@ import dev.dediamondpro.resourcify.gui.ResourcifyScreen
 import dev.dediamondpro.resourcify.gui.closeLikeEscape
 import dev.dediamondpro.resourcify.gui.sodiumButton
 import dev.dediamondpro.resourcify.gui.sodiumIconButton
+import dev.dediamondpro.resourcify.gui.sodiumScrollbars
 import dev.dediamondpro.resourcify.gui.sodiumSelectorItem
 import dev.dediamondpro.resourcify.gui.sodiumSurface
 import dev.dediamondpro.resourcify.gui.sodiumTransparent
@@ -92,7 +93,11 @@ private fun compareVersionDesc(a: String, b: String): Int {
 }
 
 private class SimpleButton : ButtonWidget<SimpleButton>()
-private class SimpleList : ListWidget<IWidget, SimpleList>()
+private class SimpleList : ListWidget<IWidget, SimpleList>() {
+    init {
+        sodiumScrollbars()
+    }
+}
 private class Container : ParentWidget<Container>()
 
 private class CenteredTextureDrawable(
