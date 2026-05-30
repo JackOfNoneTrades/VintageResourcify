@@ -20,6 +20,7 @@ package dev.dediamondpro.resourcify.gui.pack
 import com.cleanroommc.modularui.factory.ClientGUI
 import dev.dediamondpro.resourcify.VintageResourcify
 import dev.dediamondpro.resourcify.config.Config
+import dev.dediamondpro.resourcify.config.UpdateChimeState
 import dev.dediamondpro.resourcify.gui.ResourcifyStyle
 import dev.dediamondpro.resourcify.gui.browsepage.BrowseScreen
 import dev.dediamondpro.resourcify.mixins.early.minecraft.PackScreenAccessor
@@ -44,6 +45,7 @@ import org.lwjgl.opengl.GL11
 import org.fentanylsolutions.fentlib.util.FileUtil
 import java.io.File
 import java.net.URL
+import java.security.MessageDigest
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.Collections
@@ -70,6 +72,7 @@ object PackScreensAddition {
     private val UPDATE_TEXTURE = ResourceLocation(VintageResourcify.MODID, "update.png")
     private val PICK_FILE_TEXTURE = ResourceLocation(VintageResourcify.MODID, "pick_file.png")
     private val BUTTON_PRESS_SOUND = ResourceLocation("gui.button.press")
+    private val DOWNLOAD_CHIME_SOUND = ResourceLocation(VintageResourcify.MODID, "download_chime")
     private val UPDATE_CHIME_SOUND = ResourceLocation(VintageResourcify.MODID, "update_chime")
 
     @Volatile private var toastText: String? = null
@@ -374,7 +377,9 @@ object PackScreensAddition {
                 } else {
                     "${found.size} update${if (found.size == 1) "" else "s"} available"
                 }
-                if (found.isNotEmpty() && isChimeType(type)) {
+                val chimeGroup = updateChimeGroup(type)
+                val chimeHash = found.takeIf { it.isNotEmpty() }?.let { updateSetHash(it) }
+                if (chimeGroup != null && UpdateChimeState.shouldPlay(chimeGroup, chimeHash)) {
                     runClientSync { playUpdateChime() }
                 }
             } catch (e: Throwable) {
@@ -679,6 +684,9 @@ object PackScreensAddition {
                 failed > 0 -> "Updated $updated, failed $failed"
                 else -> "Updated $updated pack${if (updated == 1) "" else "s"}"
             }
+            if (updated > 0 && (prepared.size == 1 || cancelled == 0)) {
+                runClientSync { playDownloadChime() }
+            }
         }, "Resourcify-PackUpdate").apply { isDaemon = true }.start()
     }
 
@@ -977,6 +985,12 @@ object PackScreensAddition {
         )
     }
 
+    private fun playDownloadChime() {
+        Minecraft.getMinecraft().soundHandler.playSound(
+            PositionedSoundRecord.func_147674_a(DOWNLOAD_CHIME_SOUND, 1.0f)
+        )
+    }
+
     private fun showToast(text: String, durationMs: Long) {
         toastText = text
         toastUntil = Minecraft.getSystemTime() + durationMs
@@ -1058,10 +1072,35 @@ object PackScreensAddition {
         return type == ProjectType.IRIS_SHADER || type == ProjectType.OPTIFINE_SHADER
     }
 
-    private fun isChimeType(type: ProjectType): Boolean {
-        return type == ProjectType.RESOURCE_PACK ||
-            type == ProjectType.AYCY_RESOURCE_PACK ||
-            isShaderType(type)
+    private fun updateChimeGroup(type: ProjectType): String? {
+        return when {
+            type == ProjectType.RESOURCE_PACK || type == ProjectType.AYCY_RESOURCE_PACK -> UpdateChimeState.RESOURCE_PACKS
+            isShaderType(type) -> UpdateChimeState.SHADER_PACKS
+            else -> null
+        }
+    }
+
+    private fun updateSetHash(entries: List<UpdateEntry>): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        entries.map { updateSignature(it) }.sorted().forEach { signature ->
+            digest.update(signature.toByteArray(Charsets.UTF_8))
+            digest.update(0.toByte())
+        }
+        return digest.digest().joinToString("") { byte ->
+            (byte.toInt() and 0xFF).toString(16).padStart(2, '0')
+        }
+    }
+
+    private fun updateSignature(entry: UpdateEntry): String {
+        val version = entry.version
+        return listOf(
+            entry.oldFile.name,
+            version.getProjectId(),
+            version.getFileName(),
+            version.getSha1(),
+            version.getVersionNumber().orEmpty(),
+            version.getName(),
+        ).joinToString("\u001F")
     }
 
     private fun plusOrigin(): Pair<Int, Int>? {

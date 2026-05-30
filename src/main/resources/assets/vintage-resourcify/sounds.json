@@ -1,4 +1,25 @@
 {
+  "download_chime": {
+    "category": "master",
+    "sounds": [
+      "download_chime"
+    ]
+  },
+  "delete_warning": {
+    "category": "master",
+    "sounds": [
+      "delete_warning"
+    ]
+  },
+  "delete": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "delete",
+        "volume": 4.0
+      }
+    ]
+  },
   "update_chime": {
     "category": "master",
     "sounds": [

@@ -65,6 +65,7 @@ import dev.dediamondpro.resourcify.util.UrlOpener
 import dev.dediamondpro.resourcify.util.getImageAsync
 import dev.dediamondpro.resourcify.util.toURL
 import net.minecraft.client.Minecraft
+import net.minecraft.client.audio.PositionedSoundRecord
 import net.minecraft.client.gui.Gui
 import net.minecraft.client.gui.GuiScreen
 import net.minecraft.client.gui.GuiScreenResourcePacks
@@ -372,6 +373,13 @@ private const val DOWNLOAD_PANEL_H = 286
 private const val DOWNLOAD_PANEL_PAD = 12
 private val PAINTING_TEXTURE = ResourceLocation("textures/items/painting.png")
 private val GLOBE_TEXTURE = ResourceLocation(VintageResourcify.MODID, "globe.png")
+private val DOWNLOAD_CHIME_SOUND = ResourceLocation(VintageResourcify.MODID, "download_chime")
+
+private fun playDownloadChime() {
+    Minecraft.getMinecraft().soundHandler.playSound(
+        PositionedSoundRecord.func_147674_a(DOWNLOAD_CHIME_SOUND, 1.0f)
+    )
+}
 
 // See BrowseScreen's commit 8a9f9e5 for why all state lives in the lambda
 // closure rather than in instance fields.
@@ -487,6 +495,7 @@ class ProjectScreen(
                 }
                 downloadedFile[0] = target
                 setDownloadState(DownloadPanelState.DONE, "Download complete")
+                playDownloadChime()
             }
         }
     }

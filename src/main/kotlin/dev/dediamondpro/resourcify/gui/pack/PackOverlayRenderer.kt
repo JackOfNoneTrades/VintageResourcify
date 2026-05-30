@@ -22,6 +22,7 @@ import dev.dediamondpro.resourcify.config.ConfiguredPlatforms
 import dev.dediamondpro.resourcify.util.LocalIndex
 import dev.dediamondpro.resourcify.util.ShaderGuiHelper
 import net.minecraft.client.Minecraft
+import net.minecraft.client.audio.PositionedSoundRecord
 import net.minecraft.client.gui.Gui
 import net.minecraft.client.renderer.OpenGlHelper
 import net.minecraft.client.renderer.Tessellator
@@ -44,6 +45,8 @@ object PackOverlayRenderer {
     private const val BADGE_BACKGROUND_ALPHA = 0.55f
     // cross.png is a 32x16 spritesheet; left 16x16 is unhovered, right is hovered.
     private val CROSS_TEXTURE = ResourceLocation(VintageResourcify.MODID, "cross.png")
+    private val DELETE_SOUND = ResourceLocation(VintageResourcify.MODID, "delete")
+    private val DELETE_WARNING_SOUND = ResourceLocation(VintageResourcify.MODID, "delete_warning")
     private const val CROSS_TEX_WIDTH = 32
     private const val CROSS_TEX_HEIGHT = 16
     private const val CROSS_FRAME = 16
@@ -265,9 +268,13 @@ object PackOverlayRenderer {
         if (button != 0) return false
         val hit = activeRegions.firstOrNull { mouseX in it.x1..it.x2 && mouseY in it.y1..it.y2 } ?: return false
         val mc = Minecraft.getMinecraft()
+        playDeleteWarningSound()
         val confirm = object : net.minecraft.client.gui.GuiYesNoCallback {
             override fun confirmClicked(confirmed: Boolean, id: Int) {
-                if (confirmed) performDelete(hit)
+                if (confirmed) {
+                    playDeleteSound()
+                    performDelete(hit)
+                }
                 refresh()
             }
         }
@@ -280,6 +287,18 @@ object PackOverlayRenderer {
             )
         )
         return true
+    }
+
+    private fun playDeleteWarningSound() {
+        Minecraft.getMinecraft().soundHandler.playSound(
+            PositionedSoundRecord.func_147674_a(DELETE_WARNING_SOUND, 1.0f)
+        )
+    }
+
+    private fun playDeleteSound() {
+        Minecraft.getMinecraft().soundHandler.playSound(
+            PositionedSoundRecord.func_147674_a(DELETE_SOUND, 1.0f)
+        )
     }
 
     private fun performDelete(hit: DeleteRegion) {
