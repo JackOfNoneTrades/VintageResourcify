@@ -160,6 +160,7 @@ object PackScreensAddition {
 
         val plus = plusOrigin() ?: return false
         if (isInside(mouseX, mouseY, plus.first, plus.second, BUTTON_SIZE, BUTTON_SIZE)) {
+            playDefaultButtonSound()
             openBrowser(type, folder, screen)
             return true
         }
@@ -167,6 +168,7 @@ object PackScreensAddition {
         if (supportsPackFilePicking(type)) {
             val pick = pickOrigin() ?: return false
             if (isInside(mouseX, mouseY, pick.first, pick.second, BUTTON_SIZE, BUTTON_SIZE)) {
+                playDefaultButtonSound()
                 pickAndCopyPackFile(type, folder)
                 return true
             }
@@ -176,6 +178,7 @@ object PackScreensAddition {
         val up = updateOrigin() ?: return false
         if (isInside(mouseX, mouseY, up.first, up.second, BUTTON_SIZE, BUTTON_SIZE) ||
             isInsideUpdateBadge(mouseX, mouseY, up.first, up.second, badgeCount(type, folder))) {
+            playDefaultButtonSound()
             openUpdatePanel(type, folder)
             if (!checkInProgress && updatableEntries().isEmpty()) {
                 startUpdateCheck(type, folder, openPanel = true)
