@@ -1,6 +1,7 @@
 package dev.dediamondpro.resourcify.gui.pack
 
 import dev.dediamondpro.resourcify.VintageResourcify
+import dev.dediamondpro.resourcify.gui.ResourcifyStyle
 import dev.dediamondpro.resourcify.services.ProjectType
 import dev.dediamondpro.resourcify.util.ShaderGuiHelper
 import net.minecraft.client.Minecraft
@@ -82,12 +83,12 @@ object PackDropHandler : DropListener {
 
 private object PackDropOverlay {
 
-    private const val PANEL_WIDTH = 240
-    private const val PANEL_HEIGHT = 90
-    private const val ZONE_WIDTH = 180
-    private const val ZONE_HEIGHT = 46
-    private const val COLOR_ZONE_NORMAL = 0x44AAAAAA
-    private const val COLOR_ZONE_HOVER = 0xAA55FF55.toInt()
+    private const val PANEL_WIDTH = 260
+    private const val PANEL_HEIGHT = 96
+    private const val PANEL_MARGIN = 10
+    private const val PANEL_PADDING = 10
+    private const val ZONE_HEIGHT = 44
+    private const val OVERLAY_SCRIM = 0x66000000
 
     @Volatile private var overlayOpen = false
     @Volatile private var pendingFilePath: String? = null
@@ -165,10 +166,17 @@ private object PackDropOverlay {
         }
     }
 
+    private fun panelBounds(width: Int, height: Int): Bounds {
+        val panelW = PANEL_WIDTH.coerceAtMost((width - PANEL_MARGIN * 2).coerceAtLeast(120))
+        val panelH = PANEL_HEIGHT.coerceAtMost((height - PANEL_MARGIN * 2).coerceAtLeast(72))
+        return Bounds((width - panelW) / 2, (height - panelH) / 2, panelW, panelH)
+    }
+
     private fun zoneBounds(width: Int, height: Int): Bounds {
-        val zoneX = (width - ZONE_WIDTH) / 2
-        val zoneY = (height - PANEL_HEIGHT) / 2 + 32
-        return Bounds(zoneX, zoneY, ZONE_WIDTH, ZONE_HEIGHT)
+        val panel = panelBounds(width, height)
+        val zoneW = (panel.width - PANEL_PADDING * 2).coerceAtLeast(60)
+        val zoneH = ZONE_HEIGHT.coerceAtMost((panel.height - 42).coerceAtLeast(24))
+        return Bounds(panel.x + PANEL_PADDING, panel.y + panel.height - PANEL_PADDING - zoneH, zoneW, zoneH)
     }
 
     private fun isInside(bounds: Bounds, guiX: Float, guiY: Float): Boolean {
@@ -197,25 +205,31 @@ private object PackDropOverlay {
 
         override fun drawScreen(mouseX: Int, mouseY: Int, partialTicks: Float) {
             parent.drawScreen(-10_000, -10_000, partialTicks)
-            Gui.drawRect(0, 0, width, height, 0x88000000.toInt())
+            val style = ResourcifyStyle.palette("default")
+            Gui.drawRect(0, 0, width, height, OVERLAY_SCRIM)
 
-            val panelX = (width - PANEL_WIDTH) / 2
-            val panelY = (height - PANEL_HEIGHT) / 2
-            Gui.drawRect(panelX, panelY, panelX + PANEL_WIDTH, panelY + PANEL_HEIGHT, 0xDD111111.toInt())
-            Gui.drawRect(panelX + 1, panelY + 1, panelX + PANEL_WIDTH - 1, panelY + PANEL_HEIGHT - 1, 0xDD2A2A2A.toInt())
+            val panel = panelBounds(width, height)
+            Gui.drawRect(panel.x, panel.y, panel.x + panel.width, panel.y + panel.height, style.panel)
 
-            drawCenteredString(fontRendererObj, title(type), width / 2, panelY + 10, 0xFFFFFFFF.toInt())
+            fontRendererObj.drawString(title(type), panel.x + PANEL_PADDING, panel.y + 8, style.textPrimary, false)
 
             val bounds = zoneBounds(width, height)
-            val zoneColor = if (hovered) COLOR_ZONE_HOVER else COLOR_ZONE_NORMAL
-            Gui.drawRect(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height, 0xFF000000.toInt())
-            Gui.drawRect(bounds.x + 1, bounds.y + 1, bounds.x + bounds.width - 1, bounds.y + bounds.height - 1, zoneColor)
+            Gui.drawRect(
+                bounds.x,
+                bounds.y,
+                bounds.x + bounds.width,
+                bounds.y + bounds.height,
+                if (hovered) style.buttonHover else style.panelInset,
+            )
+            if (hovered) {
+                Gui.drawRect(bounds.x, bounds.y + bounds.height - 1, bounds.x + bounds.width, bounds.y + bounds.height, style.accent)
+            }
             drawCenteredString(
                 fontRendererObj,
                 I18n.format("resourcify.drop.subtitle"),
                 width / 2,
                 bounds.y + (bounds.height - fontRendererObj.FONT_HEIGHT) / 2,
-                0xFFFFFFFF.toInt(),
+                if (hovered) style.textPrimary else style.textSecondary,
             )
 
             super.drawScreen(mouseX, mouseY, partialTicks)
