@@ -19,6 +19,7 @@ package dev.dediamondpro.resourcify.gui.pack
 
 import dev.dediamondpro.resourcify.VintageResourcify
 import dev.dediamondpro.resourcify.config.ConfiguredPlatforms
+import dev.dediamondpro.resourcify.util.ClientGuiTasks
 import dev.dediamondpro.resourcify.util.LocalIndex
 import dev.dediamondpro.resourcify.util.ResourcifySounds
 import dev.dediamondpro.resourcify.util.ShaderGuiHelper
@@ -73,6 +74,7 @@ object PackOverlayRenderer {
     private val scratch = mutableListOf<DeleteRegion>()
     private var entryHoverSeenThisFrame = false
     private var lastEntryHoverKey: String? = null
+    @Volatile private var deleteReloadInProgress = false
 
     /** Reset the scratch buffer at the start of a frame. [activeRegions] keeps last frame's data. */
     fun beginFrame() {
@@ -296,6 +298,7 @@ object PackOverlayRenderer {
      * already deleted if they confirmed).
      */
     fun handleDeleteClick(mouseX: Int, mouseY: Int, button: Int, refresh: () -> Unit): Boolean {
+        if (deleteReloadInProgress) return true
         if (button != 0) return false
         val hit = deleteRegionAt(mouseX, mouseY) ?: return false
         val mc = Minecraft.getMinecraft()
@@ -303,10 +306,23 @@ object PackOverlayRenderer {
         val confirm = object : net.minecraft.client.gui.GuiYesNoCallback {
             override fun confirmClicked(confirmed: Boolean, id: Int) {
                 if (confirmed) {
-                    playDeleteSound()
-                    performDelete(hit)
+                    deleteReloadInProgress = true
+                    var deleted = false
+                    try {
+                        deleted = performDelete(hit)
+                        refresh()
+                    } finally {
+                        ClientGuiTasks.runNextClientTick {
+                            try {
+                                if (deleted) playDeleteSound()
+                            } finally {
+                                deleteReloadInProgress = false
+                            }
+                        }
+                    }
+                } else {
+                    refresh()
                 }
-                refresh()
             }
         }
         mc.displayGuiScreen(
@@ -335,7 +351,7 @@ object PackOverlayRenderer {
         ResourcifySounds.play(DELETE_SOUND)
     }
 
-    private fun performDelete(hit: DeleteRegion) {
+    private fun performDelete(hit: DeleteRegion): Boolean {
         try {
             // Drop Forge's open handle for resource packs before deleting.
             // For shader packs we don't hold an open handle, and the call
@@ -356,8 +372,11 @@ object PackOverlayRenderer {
             } catch (e: Throwable) {
                 VintageResourcify.LOG.warn("Could not drop {} from active resource pack list", hit.file.name, e)
             }
-            if (hit.file.isDirectory) deleteRecursively(hit.file)
-            else hit.file.delete()
+            val deleted = deleteTarget(hit.file)
+            if (!deleted) {
+                VintageResourcify.LOG.warn("Could not delete pack {}", hit.file)
+                return false
+            }
             LocalIndex.forFolder(hit.folder).remove(hit.file.name)
             // Drive the same refresh path the host screen's "Done" button
             // would. Without this, the repository / Iris keeps the deleted
@@ -376,24 +395,31 @@ object PackOverlayRenderer {
                         (e as? dev.dediamondpro.resourcify.mixins.early.minecraft.ResourcePackRepositoryEntryAccessor)
                             ?.resourcePackFile != hit.file
                     }
-                    if (filtered.size != current.size) {
+                    val wasEnabled = filtered.size != current.size
+                    if (wasEnabled) {
                         repo.func_148527_a(filtered)
                     }
                     repo.updateRepositoryEntriesAll()
-                    mc.refreshResources()
+                    if (wasEnabled) {
+                        mc.refreshResources()
+                    }
                 }
             } catch (e: Throwable) {
                 VintageResourcify.LOG.warn("Could not refresh resources after delete", e)
             }
             VintageResourcify.LOG.info("Deleted pack {} from {}", hit.file.name, hit.folder)
+            return true
         } catch (e: Throwable) {
             VintageResourcify.LOG.warn("Failed to delete {}", hit.file, e)
+            return false
         }
     }
 
-    private fun deleteRecursively(file: File) {
-        if (file.isDirectory) file.listFiles()?.forEach { deleteRecursively(it) }
-        file.delete()
+    private fun deleteTarget(file: File): Boolean {
+        if (!file.isDirectory) return file.delete()
+        var deletedChildren = true
+        file.listFiles()?.forEach { deletedChildren = deleteTarget(it) && deletedChildren }
+        return file.delete() && deletedChildren
     }
 
     private fun displayName(platform: String): String = when (platform.lowercase()) {
