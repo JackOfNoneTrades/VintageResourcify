@@ -5,6 +5,7 @@ import net.minecraft.client.gui.GuiScreen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import dev.dediamondpro.resourcify.gui.pack.PackOverlayRenderer;
@@ -34,6 +35,16 @@ public class MixinShaderPackScreen {
             mouseX,
             mouseY);
         PackOverlayRenderer.INSTANCE.endFrame();
+    }
+
+    @ModifyVariable(method = "drawScreen", at = @At("HEAD"), argsOnly = true, ordinal = 0)
+    private int resourcify$maskMouseXWhenUpdatePanelOpen(int mouseX) {
+        return this.resourcify$shouldMaskParentMouse() ? 0 : mouseX;
+    }
+
+    @ModifyVariable(method = "drawScreen", at = @At("HEAD"), argsOnly = true, ordinal = 1)
+    private int resourcify$maskMouseYWhenUpdatePanelOpen(int mouseY) {
+        return this.resourcify$shouldMaskParentMouse() ? 0 : mouseY;
     }
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
@@ -66,5 +77,10 @@ public class MixinShaderPackScreen {
         if (PackScreensAddition.INSTANCE.onKeyTyped(keyCode)) {
             ci.cancel();
         }
+    }
+
+    private boolean resourcify$shouldMaskParentMouse() {
+        return PackScreensAddition.INSTANCE
+            .shouldMaskParentMouse(ProjectType.IRIS_SHADER, IrisHelper.INSTANCE.getShaderpacksFolder());
     }
 }

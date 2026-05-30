@@ -1,0 +1,8 @@
+{
+  "update_chime": {
+    "category": "master",
+    "sounds": [
+      "update_chime"
+    ]
+  }
+}

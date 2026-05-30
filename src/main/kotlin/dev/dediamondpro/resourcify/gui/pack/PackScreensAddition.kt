@@ -33,6 +33,7 @@ import dev.dediamondpro.resourcify.util.DownloadResult
 import dev.dediamondpro.resourcify.util.ShaderGuiHelper
 import dev.dediamondpro.resourcify.util.LocalIndex
 import net.minecraft.client.Minecraft
+import net.minecraft.client.audio.PositionedSoundRecord
 import net.minecraft.client.gui.Gui
 import net.minecraft.client.gui.GuiScreen
 import net.minecraft.client.gui.GuiScreenResourcePacks
@@ -63,10 +64,13 @@ object PackScreensAddition {
     private const val TEXT_BUTTON_HEIGHT = 22
     private const val BADGE_HEIGHT = 14
     private const val PROGRESS_HEIGHT = 8
+    private const val UPDATE_SCREEN_SCRIM = 0x66000000
 
     private val PLUS_TEXTURE = ResourceLocation(VintageResourcify.MODID, "plus.png")
     private val UPDATE_TEXTURE = ResourceLocation(VintageResourcify.MODID, "update.png")
     private val PICK_FILE_TEXTURE = ResourceLocation(VintageResourcify.MODID, "pick_file.png")
+    private val BUTTON_PRESS_SOUND = ResourceLocation("gui.button.press")
+    private val UPDATE_CHIME_SOUND = ResourceLocation(VintageResourcify.MODID, "update_chime")
 
     @Volatile private var toastText: String? = null
     @Volatile private var toastUntil: Long = 0L
@@ -94,14 +98,16 @@ object PackScreensAddition {
             autoCheckIfFirstSeen(screen, type, folder)
         }
 
-        val topButtonTooltipEnabled = !(updatePanelOpen && matchesPanel(type, folder))
+        val panelActive = updatePanelOpen && matchesPanel(type, folder)
+        val (topMouseX, topMouseY) = if (panelActive) -1 to -1 else mouseX to mouseY
+        val topButtonTooltipEnabled = !panelActive
         val (plusX, plusY) = plusOrigin() ?: return
         drawIconButton(
             plusX,
             plusY,
             PLUS_TEXTURE,
-            mouseX,
-            mouseY,
+            topMouseX,
+            topMouseY,
             enabled = true,
             tooltip = browseTooltip(type).takeIf { topButtonTooltipEnabled },
         )
@@ -112,8 +118,8 @@ object PackScreensAddition {
                 pickX,
                 pickY,
                 PICK_FILE_TEXTURE,
-                mouseX,
-                mouseY,
+                topMouseX,
+                topMouseY,
                 enabled = true,
                 tooltip = importTooltip(type).takeIf { topButtonTooltipEnabled },
             )
@@ -125,8 +131,8 @@ object PackScreensAddition {
                 upX,
                 upY,
                 UPDATE_TEXTURE,
-                mouseX,
-                mouseY,
+                topMouseX,
+                topMouseY,
                 enabled = true,
                 tooltip = updateTooltip(type, folder).takeIf { topButtonTooltipEnabled },
             )
@@ -136,8 +142,9 @@ object PackScreensAddition {
             }
         }
 
-        if (updatePanelOpen && matchesPanel(type, folder)) {
-            drawUpdatePanel(type, folder, screen, mouseX, mouseY)
+        if (panelActive) {
+            val (panelMouseX, panelMouseY) = scaledMousePosition(screen)
+            drawUpdatePanel(type, folder, screen, panelMouseX, panelMouseY)
         } else {
             drawToast(plusY + BUTTON_SIZE + 4)
         }
@@ -219,6 +226,10 @@ object PackScreensAddition {
             updateScroll = (updateScroll - wheel / 120).coerceIn(0, maxScroll)
         }
         return true
+    }
+
+    fun shouldMaskParentMouse(type: ProjectType, folder: File): Boolean {
+        return updatePanelOpen && matchesPanel(type, folder)
     }
 
     private fun pruneIfFirstSeen(screen: GuiScreen, folder: File) {
@@ -360,6 +371,9 @@ object PackScreensAddition {
                 } else {
                     "${found.size} update${if (found.size == 1) "" else "s"} available"
                 }
+                if (found.isNotEmpty() && isChimeType(type)) {
+                    runClientSync { playUpdateChime() }
+                }
             } catch (e: Throwable) {
                 VintageResourcify.LOG.warn("Update check failed for {}", folder, e)
                 updateStatusText = "Update check failed"
@@ -407,23 +421,23 @@ object PackScreensAddition {
     private fun drawUpdatePanel(type: ProjectType, folder: File, screen: GuiScreen, mouseX: Int, mouseY: Int) {
         val mc = Minecraft.getMinecraft()
         val fr = mc.fontRenderer ?: return
+        val style = ResourcifyStyle.palette("default")
         val panelW = PANEL_WIDTH.coerceAtMost(screen.width - PANEL_MARGIN * 2).coerceAtLeast(240)
         val panelH = PANEL_HEIGHT.coerceAtMost(screen.height - PANEL_MARGIN * 2).coerceAtLeast(170)
         val panelX = (screen.width - panelW) / 2
         val panelY = (screen.height - panelH) / 2
 
-        Gui.drawRect(0, 0, screen.width, screen.height, 0x77000000)
-        Gui.drawRect(panelX, panelY, panelX + panelW, panelY + panelH, 0xFF202020.toInt())
-        Gui.drawRect(panelX + 1, panelY + 1, panelX + panelW - 1, panelY + panelH - 1, 0xFFF0F0F0.toInt())
+        Gui.drawRect(0, 0, screen.width, screen.height, UPDATE_SCREEN_SCRIM)
+        Gui.drawRect(panelX, panelY, panelX + panelW, panelY + panelH, style.panel)
 
-        fr.drawString("Available updates", panelX + PANEL_PADDING, panelY + 8, 0x202020, false)
+        fr.drawString("Available updates", panelX + PANEL_PADDING, panelY + 8, style.textPrimary, false)
         val status = when {
             updateInProgress -> updateStatusText
             checkInProgress -> "Checking for updates..."
             else -> updateStatusText
         }
         if (status.isNotBlank()) {
-            fr.drawString(trimToWidth(fr, status, panelW - PANEL_PADDING * 2 - 120), panelX + PANEL_PADDING, panelY + 20, 0x606060, false)
+            fr.drawString(trimToWidth(fr, status, panelW - PANEL_PADDING * 2 - 120), panelX + PANEL_PADDING, panelY + 20, style.textSecondary, false)
         }
 
         val listX = panelX + PANEL_PADDING
@@ -434,17 +448,17 @@ object PackScreensAddition {
         val maxScroll = maxScroll(entries.size, listH)
         updateScroll = updateScroll.coerceIn(0, maxScroll)
 
-        Gui.drawRect(listX, listY, listX + listW, listY + listH, 0xFFE7E7E7.toInt())
+        Gui.drawRect(listX, listY, listX + listW, listY + listH, style.panelInset)
         beginScissor(listX, listY, listW, listH, screen)
         try {
             if (entries.isEmpty()) {
                 val text = if (checkInProgress) "Checking..." else "No updates available"
-                fr.drawString(text, listX + 8, listY + 8, 0x505050, false)
+                fr.drawString(text, listX + 8, listY + 8, style.textSecondary, false)
             } else {
                 val first = updateScroll
                 val last = (first + listH / ROW_HEIGHT + 2).coerceAtMost(entries.size)
                 for (index in first until last) {
-                    drawUpdateEntry(entries[index], index, listX, listY + (index - first) * ROW_HEIGHT, listW, mouseX, mouseY)
+                    drawUpdateEntry(entries[index], index, listX, listY + (index - first) * ROW_HEIGHT, listW, mouseX, mouseY, style)
                 }
             }
         } finally {
@@ -458,7 +472,7 @@ object PackScreensAddition {
             val barX = panelX + PANEL_PADDING
             val barY = buttonY + (TEXT_BUTTON_HEIGHT - PROGRESS_HEIGHT) / 2
             val barW = panelW - PANEL_PADDING * 3 - cancelW - 8
-            drawProgressBar(barX, barY, barW, currentProgress())
+            drawProgressBar(barX, barY, barW, currentProgress(), style)
             drawTextButton(
                 panelX + panelW - PANEL_PADDING - cancelW,
                 buttonY,
@@ -467,6 +481,7 @@ object PackScreensAddition {
                 "Cancel",
                 enabled = true,
                 hover = isInside(mouseX, mouseY, panelX + panelW - PANEL_PADDING - cancelW, buttonY, cancelW, TEXT_BUTTON_HEIGHT),
+                style = style,
             )
         } else {
             val buttons = bottomButtons(panelX, panelY, panelW, panelH)
@@ -479,6 +494,7 @@ object PackScreensAddition {
                 "Update All",
                 enabled = canUpdate,
                 hover = canUpdate && isInside(mouseX, mouseY, buttons.updateAllX, buttons.y, buttons.updateAllW, TEXT_BUTTON_HEIGHT),
+                style = style,
             )
             drawTextButton(
                 buttons.checkX,
@@ -488,6 +504,7 @@ object PackScreensAddition {
                 buttons.checkLabel,
                 enabled = !checkInProgress,
                 hover = !checkInProgress && isInside(mouseX, mouseY, buttons.checkX, buttons.y, buttons.checkW, TEXT_BUTTON_HEIGHT),
+                style = style,
             )
             drawTextButton(
                 buttons.closeX,
@@ -497,29 +514,35 @@ object PackScreensAddition {
                 "Close",
                 enabled = true,
                 hover = isInside(mouseX, mouseY, buttons.closeX, buttons.y, buttons.closeW, TEXT_BUTTON_HEIGHT),
+                style = style,
             )
         }
     }
 
-    private fun drawUpdateEntry(entry: UpdateEntry, index: Int, x: Int, y: Int, width: Int, mouseX: Int, mouseY: Int) {
+    private fun drawUpdateEntry(entry: UpdateEntry, index: Int, x: Int, y: Int, width: Int, mouseX: Int, mouseY: Int, style: ResourcifyStyle.Palette) {
         val fr = Minecraft.getMinecraft().fontRenderer ?: return
-        val rowColor = if (index % 2 == 0) 0xFFF7F7F7.toInt() else 0xFFFFFFFF.toInt()
+        val hovered = isInside(mouseX, mouseY, x, y, width, ROW_HEIGHT)
+        val rowColor = when {
+            hovered -> style.rowHover
+            index % 2 == 0 -> style.rowIdle
+            else -> style.rowDisabled
+        }
         Gui.drawRect(x, y, x + width, y + ROW_HEIGHT - 1, rowColor)
         val buttonEnabled = !updateInProgress && entry.status != UpdateStatus.UPDATED && entry.status != UpdateStatus.UPDATING
         val buttonX = x + width - BUTTON_SIZE - 6
         val buttonY = y + (ROW_HEIGHT - BUTTON_SIZE) / 2
         val textW = buttonX - x - 12
 
-        fr.drawString(trimToWidth(fr, entry.oldFile.name, textW), x + 6, y + 5, 0x202020, false)
+        fr.drawString(trimToWidth(fr, entry.oldFile.name, textW), x + 6, y + 5, style.textPrimary, false)
         val version = "to ${versionLabel(entry.version)}"
-        fr.drawString(trimToWidth(fr, version, textW), x + 6, y + 17, 0x555555, false)
+        fr.drawString(trimToWidth(fr, version, textW), x + 6, y + 17, style.textSecondary, false)
 
         val status = statusLabel(entry)
         if (status.isNotEmpty()) {
             val statusColor = when (entry.status) {
-                UpdateStatus.UPDATED -> 0x207020
-                UpdateStatus.FAILED, UpdateStatus.CANCELLED -> 0xA03030
-                else -> 0x606060
+                UpdateStatus.UPDATED -> style.accent
+                UpdateStatus.FAILED, UpdateStatus.CANCELLED -> 0xFFFF7777.toInt()
+                else -> style.textSecondary
             }
             fr.drawString(status, x + 6, y + 28, statusColor, false)
         }
@@ -550,6 +573,7 @@ object PackScreensAddition {
             val cancelX = panelX + panelW - PANEL_PADDING - cancelW
             val cancelY = panelY + panelH - TEXT_BUTTON_HEIGHT - PANEL_PADDING
             if (isInside(mouseX, mouseY, cancelX, cancelY, cancelW, TEXT_BUTTON_HEIGHT)) {
+                playDefaultButtonSound()
                 updateCancelRequested = true
                 updateStatusText = "Cancelling..."
                 currentDownloadUrl?.let { DownloadManager.cancelDownload(it) }
@@ -571,7 +595,9 @@ object PackScreensAddition {
             val buttonX = listX + listW - BUTTON_SIZE - 6
             val buttonY = rowY + (ROW_HEIGHT - BUTTON_SIZE) / 2
             if (entry.status != UpdateStatus.UPDATED &&
+                entry.status != UpdateStatus.UPDATING &&
                 isInside(mouseX, mouseY, buttonX, buttonY, BUTTON_SIZE, BUTTON_SIZE)) {
+                playDefaultButtonSound()
                 startUpdate(listOf(entry), type, folder)
                 return true
             }
@@ -581,6 +607,7 @@ object PackScreensAddition {
         if (isInside(mouseX, mouseY, buttons.updateAllX, buttons.y, buttons.updateAllW, TEXT_BUTTON_HEIGHT)) {
             val targets = updatableEntries()
             if (targets.isNotEmpty()) {
+                playDefaultButtonSound()
                 startUpdate(targets, type, folder)
             }
             return true
@@ -588,12 +615,14 @@ object PackScreensAddition {
 
         if (isInside(mouseX, mouseY, buttons.checkX, buttons.y, buttons.checkW, TEXT_BUTTON_HEIGHT)) {
             if (!checkInProgress) {
+                playDefaultButtonSound()
                 startUpdateCheck(type, folder, openPanel = true)
             }
             return true
         }
 
         if (isInside(mouseX, mouseY, buttons.closeX, buttons.y, buttons.closeW, TEXT_BUTTON_HEIGHT)) {
+            playDefaultButtonSound()
             updatePanelOpen = false
             return true
         }
@@ -778,17 +807,18 @@ object PackScreensAddition {
         }
     }
 
-    private fun drawTextButton(x: Int, y: Int, width: Int, height: Int, text: String, enabled: Boolean, hover: Boolean) {
+    private fun drawTextButton(x: Int, y: Int, width: Int, height: Int, text: String, enabled: Boolean, hover: Boolean, style: ResourcifyStyle.Palette) {
         val fr = Minecraft.getMinecraft().fontRenderer ?: return
-        val border = if (enabled) 0xFF1A1A1A.toInt() else 0xFF777777.toInt()
         val fill = when {
-            !enabled -> 0xFFBDBDBD.toInt()
-            hover -> 0xFFE0E0E0.toInt()
-            else -> 0xFFD2D2D2.toInt()
+            !enabled -> style.buttonDisabled
+            hover -> style.buttonHover
+            else -> style.buttonIdle
         }
-        Gui.drawRect(x, y, x + width, y + height, border)
-        Gui.drawRect(x + 1, y + 1, x + width - 1, y + height - 1, fill)
-        val color = if (enabled) 0x202020 else 0x777777
+        Gui.drawRect(x, y, x + width, y + height, fill)
+        if (enabled && hover) {
+            Gui.drawRect(x, y + height - 1, x + width, y + height, style.accent)
+        }
+        val color = if (enabled) style.textPrimary else style.textSecondary
         fr.drawString(text, x + (width - fr.getStringWidth(text)) / 2, y + (height - fr.FONT_HEIGHT) / 2, color, false)
     }
 
@@ -804,12 +834,12 @@ object PackScreensAddition {
         fr.drawString(text, x + (width - textWidth + 1) / 2, y + (BADGE_HEIGHT - fr.FONT_HEIGHT + 1) / 2, 0x202020, false)
     }
 
-    private fun drawProgressBar(x: Int, y: Int, width: Int, progress: Float) {
-        Gui.drawRect(x, y, x + width, y + PROGRESS_HEIGHT, 0xFF8B8B8B.toInt())
-        Gui.drawRect(x + 1, y + 1, x + width - 1, y + PROGRESS_HEIGHT - 1, 0xFFC8C8C8.toInt())
+    private fun drawProgressBar(x: Int, y: Int, width: Int, progress: Float, style: ResourcifyStyle.Palette) {
+        Gui.drawRect(x, y, x + width, y + PROGRESS_HEIGHT, style.progressBackground)
+        Gui.drawRect(x + 1, y + 1, x + width - 1, y + PROGRESS_HEIGHT - 1, style.progressTrack)
         val fillWidth = ((width - 2) * progress.coerceIn(0f, 1f)).toInt()
         if (fillWidth > 0) {
-            Gui.drawRect(x + 1, y + 1, x + 1 + fillWidth, y + PROGRESS_HEIGHT - 1, 0xFF4F8DFF.toInt())
+            Gui.drawRect(x + 1, y + 1, x + 1 + fillWidth, y + PROGRESS_HEIGHT - 1, style.progressFill)
         }
     }
 
@@ -924,6 +954,26 @@ object PackScreensAddition {
         return (rowCount - visibleRows).coerceAtLeast(0)
     }
 
+    private fun scaledMousePosition(screen: GuiScreen): Pair<Int, Int> {
+        val mc = Minecraft.getMinecraft()
+        if (mc.displayWidth <= 0 || mc.displayHeight <= 0) return 0 to 0
+        val x = Mouse.getX() * screen.width / mc.displayWidth
+        val y = screen.height - Mouse.getY() * screen.height / mc.displayHeight - 1
+        return x.coerceIn(0, (screen.width - 1).coerceAtLeast(0)) to y.coerceIn(0, (screen.height - 1).coerceAtLeast(0))
+    }
+
+    private fun playDefaultButtonSound() {
+        Minecraft.getMinecraft().soundHandler.playSound(
+            PositionedSoundRecord.func_147674_a(BUTTON_PRESS_SOUND, 1.0f)
+        )
+    }
+
+    private fun playUpdateChime() {
+        Minecraft.getMinecraft().soundHandler.playSound(
+            PositionedSoundRecord.func_147674_a(UPDATE_CHIME_SOUND, 1.0f)
+        )
+    }
+
     private fun showToast(text: String, durationMs: Long) {
         toastText = text
         toastUntil = Minecraft.getSystemTime() + durationMs
@@ -1003,6 +1053,12 @@ object PackScreensAddition {
 
     private fun isShaderType(type: ProjectType): Boolean {
         return type == ProjectType.IRIS_SHADER || type == ProjectType.OPTIFINE_SHADER
+    }
+
+    private fun isChimeType(type: ProjectType): Boolean {
+        return type == ProjectType.RESOURCE_PACK ||
+            type == ProjectType.AYCY_RESOURCE_PACK ||
+            isShaderType(type)
     }
 
     private fun plusOrigin(): Pair<Int, Int>? {

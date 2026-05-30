@@ -10,6 +10,7 @@ import net.minecraft.client.resources.I18n;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import dev.dediamondpro.resourcify.gui.pack.PackOverlayRenderer;
@@ -75,6 +76,16 @@ public class MixinGuiScreenResourcePacks extends GuiScreen {
         PackOverlayRenderer.INSTANCE.endFrame();
     }
 
+    @ModifyVariable(method = "drawScreen", at = @At("HEAD"), argsOnly = true, ordinal = 0)
+    private int resourcify$maskMouseXWhenUpdatePanelOpen(int mouseX) {
+        return this.resourcify$shouldMaskParentMouse() ? 0 : mouseX;
+    }
+
+    @ModifyVariable(method = "drawScreen", at = @At("HEAD"), argsOnly = true, ordinal = 1)
+    private int resourcify$maskMouseYWhenUpdatePanelOpen(int mouseY) {
+        return this.resourcify$shouldMaskParentMouse() ? 0 : mouseY;
+    }
+
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
     private void resourcify$clickAddOrDelete(int mouseX, int mouseY, int mouseButton, CallbackInfo ci) {
         GuiScreen parent = ((PackScreenAccessor) (Object) this).getParentScreen();
@@ -101,6 +112,14 @@ public class MixinGuiScreenResourcePacks extends GuiScreen {
             (GuiScreen) (Object) this)) {
             ci.cancel();
         }
+    }
+
+    private boolean resourcify$shouldMaskParentMouse() {
+        return PackScreensAddition.INSTANCE.shouldMaskParentMouse(
+            ProjectType.RESOURCE_PACK,
+            Minecraft.getMinecraft()
+                .getResourcePackRepository()
+                .getDirResourcepacks());
     }
 
 }

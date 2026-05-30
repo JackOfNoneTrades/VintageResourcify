@@ -49,6 +49,7 @@ Vintage Resourcify supports Angelica [![curse](images/icons/curse.png)](https://
 * Resourcify by DeDiamondPro
 * [Catalogue-Vintage](https://github.com/RuiXuqi/Catalogue-Vintage) for globe icon
 * [GT:NH buildscript](https://github.com/GTNewHorizons/ExampleMod1.7.10)
+* The update chime is from [Zapsplat](https://www.zapsplat.com) ([Licebse](https://www.zapsplat.com/license-type/standard-license/))
 
 ## License
 
