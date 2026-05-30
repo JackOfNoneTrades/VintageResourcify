@@ -297,7 +297,7 @@ object PackOverlayRenderer {
      */
     fun handleDeleteClick(mouseX: Int, mouseY: Int, button: Int, refresh: () -> Unit): Boolean {
         if (button != 0) return false
-        val hit = activeRegions.firstOrNull { mouseX in it.x1..it.x2 && mouseY in it.y1..it.y2 } ?: return false
+        val hit = deleteRegionAt(mouseX, mouseY) ?: return false
         val mc = Minecraft.getMinecraft()
         playDeleteWarningSound()
         val confirm = object : net.minecraft.client.gui.GuiYesNoCallback {
@@ -319,6 +319,13 @@ object PackOverlayRenderer {
         )
         return true
     }
+
+    fun isDeleteButtonAt(mouseX: Int, mouseY: Int): Boolean =
+        deleteRegionAt(mouseX, mouseY) != null
+
+    private fun deleteRegionAt(mouseX: Int, mouseY: Int): DeleteRegion? =
+        activeRegions.firstOrNull { mouseX in it.x1..it.x2 && mouseY in it.y1..it.y2 }
+            ?: scratch.firstOrNull { mouseX in it.x1..it.x2 && mouseY in it.y1..it.y2 }
 
     private fun playDeleteWarningSound() {
         ResourcifySounds.play(DELETE_WARNING_SOUND)
