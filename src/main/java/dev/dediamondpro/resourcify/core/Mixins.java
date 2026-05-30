@@ -52,6 +52,11 @@ public class Mixins extends FentMixins {
             .side(Side.CLIENT)
             .phase(Phase.EARLY)
             .build();
+        registry.mixin("MixinIrisShaderPackSelectionList")
+            .modid("angelica")
+            .side(Side.CLIENT)
+            .phase(Phase.EARLY)
+            .build();
         registry.mixin("MixinSwanSongGuiShaders")
             .modid("swansong")
             .side(Side.CLIENT)

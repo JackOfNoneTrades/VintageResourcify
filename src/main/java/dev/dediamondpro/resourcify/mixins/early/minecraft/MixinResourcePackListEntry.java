@@ -5,9 +5,11 @@ import net.minecraft.client.resources.ResourcePackListEntry;
 import net.minecraft.client.resources.ResourcePackListEntryFound;
 
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import dev.dediamondpro.resourcify.gui.pack.PackOverlayRenderer;
 
@@ -19,11 +21,30 @@ import dev.dediamondpro.resourcify.gui.pack.PackOverlayRenderer;
 @Mixin(ResourcePackListEntry.class)
 public abstract class MixinResourcePackListEntry {
 
+    @Shadow
+    protected abstract boolean func_148310_d();
+
+    @Shadow
+    protected abstract boolean func_148309_e();
+
+    @Shadow
+    protected abstract boolean func_148308_f();
+
+    @Shadow
+    protected abstract boolean func_148314_g();
+
+    @Shadow
+    protected abstract boolean func_148307_h();
+
     @Inject(method = "drawEntry", at = @At("TAIL"))
     private void resourcify$drawPlatformBadge(int slotIndex, int x, int y, int listWidth, int slotHeight,
         Tessellator tessellator, int mouseX, int mouseY, boolean isSelected, CallbackInfo ci) {
         Object self = this;
         if (!(self instanceof ResourcePackListEntryFound)) return;
+        boolean rowHovered = mouseX >= x && mouseX < x + listWidth && mouseY >= y && mouseY < y + slotHeight;
+        if (rowHovered) {
+            PackOverlayRenderer.INSTANCE.markResourcePackEntryHovered(self);
+        }
         ResourcePackRepositoryEntryAccessor entry = (ResourcePackRepositoryEntryAccessor) ((ResourcePackListEntryFound) self)
             .func_148318_i();
         java.io.File file = entry.getResourcePackFile();
@@ -40,7 +61,6 @@ public abstract class MixinResourcePackListEntry {
         // Cross: shown for every pack (tracked or not) while its row is
         // hovered. We let the user delete any file in the folder, not just
         // ones we know about.
-        boolean rowHovered = mouseX >= x && mouseX < x + listWidth && mouseY >= y && mouseY < y + slotHeight;
         if (rowHovered) {
             int cross = 16;
             // Bigger right inset so the cross stays clear of the GuiSlot
@@ -50,6 +70,19 @@ public abstract class MixinResourcePackListEntry {
             int cx = x + listWidth - cross - 10;
             int cy = y + (slotHeight - cross) / 2 - 2;
             PackOverlayRenderer.INSTANCE.drawDeleteButton(folder, file, file.getName(), cx, cy, cross, mouseX, mouseY);
+        }
+    }
+
+    @Inject(method = "mousePressed", at = @At("HEAD"))
+    private void resourcify$playSoundOnPackArrow(int index, int x, int y, int mouseEvent, int relativeX, int relativeY,
+        CallbackInfoReturnable<Boolean> cir) {
+        if (!this.func_148310_d() || relativeX > 32) return;
+        if (this.func_148309_e() || (relativeX < 16 && this.func_148308_f())) {
+            PackOverlayRenderer.INSTANCE.playEntrySelectSound();
+            return;
+        }
+        if (relativeX > 16 && ((relativeY < 16 && this.func_148314_g()) || (relativeY > 16 && this.func_148307_h()))) {
+            PackOverlayRenderer.INSTANCE.playEntryTickSound();
         }
     }
 }

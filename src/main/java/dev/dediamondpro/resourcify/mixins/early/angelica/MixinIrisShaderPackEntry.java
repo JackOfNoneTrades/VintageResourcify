@@ -23,6 +23,9 @@ public class MixinIrisShaderPackEntry {
     private void resourcify$drawPlatformBadge(ShaderPackScreen screen, int index, int x, int y, int listWidth,
         Tessellator tessellator, int mouseX, int mouseY, boolean isMouseOver, CallbackInfo ci) {
         String packName = ((ShaderPackEntry) (Object) this).getPackName();
+        if (isMouseOver) {
+            PackOverlayRenderer.INSTANCE.markShaderEntryHovered(screen, packName);
+        }
         java.io.File folder = PackOverlayRenderer.INSTANCE.shaderpacksFolder();
         java.io.File file = PackOverlayRenderer.INSTANCE.shaderPackFile(folder, packName);
         if (file == null) return;

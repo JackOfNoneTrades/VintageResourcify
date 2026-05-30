@@ -47,6 +47,8 @@ object PackOverlayRenderer {
     private val CROSS_TEXTURE = ResourceLocation(VintageResourcify.MODID, "cross.png")
     private val DELETE_SOUND = ResourceLocation(VintageResourcify.MODID, "delete")
     private val DELETE_WARNING_SOUND = ResourceLocation(VintageResourcify.MODID, "delete_warning")
+    private val ENTRY_HOVER_SOUND = ResourceLocation(VintageResourcify.MODID, "tick")
+    private val ENTRY_SELECT_SOUND = ResourceLocation(VintageResourcify.MODID, "select")
     private const val CROSS_TEX_WIDTH = 32
     private const val CROSS_TEX_HEIGHT = 16
     private const val CROSS_FRAME = 16
@@ -69,16 +71,22 @@ object PackOverlayRenderer {
     // to hit-test against. We swap at end-of-frame.
     private val activeRegions = mutableListOf<DeleteRegion>()
     private val scratch = mutableListOf<DeleteRegion>()
+    private var entryHoverSeenThisFrame = false
+    private var lastEntryHoverKey: String? = null
 
     /** Reset the scratch buffer at the start of a frame. [activeRegions] keeps last frame's data. */
     fun beginFrame() {
         scratch.clear()
+        entryHoverSeenThisFrame = false
     }
 
     /** Swap [scratch] into [activeRegions]. Called at drawScreen TAIL so clicks during the next frame see this frame's data. */
     fun endFrame() {
         activeRegions.clear()
         activeRegions.addAll(scratch)
+        if (!entryHoverSeenThisFrame) {
+            lastEntryHoverKey = null
+        }
     }
 
     private fun textureFor(platform: String): PlatformTexture? {
@@ -188,6 +196,35 @@ object PackOverlayRenderer {
         pendingTooltipText = text
         pendingTooltipX = mouseX
         pendingTooltipY = mouseY
+    }
+
+    fun markShaderEntryHovered(screen: Any, packName: String) {
+        markEntryHovered("shader:${System.identityHashCode(screen)}:$packName")
+    }
+
+    fun markResourcePackEntryHovered(entry: Any) {
+        markEntryHovered("resource:${System.identityHashCode(entry)}")
+    }
+
+    private fun markEntryHovered(key: String) {
+        entryHoverSeenThisFrame = true
+        if (lastEntryHoverKey == key) return
+        lastEntryHoverKey = key
+        Minecraft.getMinecraft().soundHandler.playSound(
+            PositionedSoundRecord.func_147674_a(ENTRY_HOVER_SOUND, 1.0f)
+        )
+    }
+
+    fun playEntrySelectSound() {
+        Minecraft.getMinecraft().soundHandler.playSound(
+            PositionedSoundRecord.func_147674_a(ENTRY_SELECT_SOUND, 1.0f)
+        )
+    }
+
+    fun playEntryTickSound() {
+        Minecraft.getMinecraft().soundHandler.playSound(
+            PositionedSoundRecord.func_147674_a(ENTRY_HOVER_SOUND, 1.0f)
+        )
     }
 
     /**

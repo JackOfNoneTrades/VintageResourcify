@@ -31,5 +31,17 @@
     "sounds": [
       "update_chime"
     ]
+  },
+  "tick": {
+    "category": "master",
+    "sounds": [
+      "tick"
+    ]
+  },
+  "select": {
+    "category": "master",
+    "sounds": [
+      "select"
+    ]
   }
 }
