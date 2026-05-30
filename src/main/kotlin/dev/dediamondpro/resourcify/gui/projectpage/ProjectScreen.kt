@@ -860,6 +860,12 @@ class ProjectScreen(
         .child(galleryStatus)
         .child(galleryLeft)
         .child(galleryRight)
+        .child(
+            KeyCatcherWidget {
+                galleryOverlay.setEnabled(false)
+            }
+                .top(0).left(0).width(sr0.scaledWidth).height(sr0.scaledHeight)
+        )
     galleryOverlay.setEnabled(false)
 
     val downloadPanelBg = style.panelRaised

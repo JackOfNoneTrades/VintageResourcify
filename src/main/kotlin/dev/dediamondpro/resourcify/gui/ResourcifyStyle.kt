@@ -12,6 +12,7 @@ import com.cleanroommc.modularui.widgets.ButtonWidget
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget
 import dev.dediamondpro.resourcify.VintageResourcify
 import net.minecraft.client.gui.Gui
+import org.lwjgl.input.Keyboard
 import org.fentanylsolutions.fentlib.gui.sodiumgui.SodiumGuiTheme
 import java.util.function.Function
 
@@ -107,6 +108,19 @@ object ResourcifyStyle {
 open class ResourcifyScreen(
     mainPanelCreator: Function<ModularGuiContext, ModularPanel>,
 ) : ModularScreen(VintageResourcify.MODID, mainPanelCreator) {
+    override fun onKeyPressed(typedChar: Char, keyCode: Int): Boolean {
+        if (keyCode != Keyboard.KEY_ESCAPE) {
+            return super.onKeyPressed(typedChar, keyCode)
+        }
+
+        if (!getContext().isFocused && super.onKeyPressed(typedChar, keyCode)) {
+            return true
+        }
+
+        closeLikeEscape()
+        return true
+    }
+
     override fun drawScreen() {
         getScreenWrapper().getGuiScreen().drawDefaultBackground()
         super.drawScreen()
