@@ -7,6 +7,7 @@
 [![hub](images/badges/github.png)](https://github.com/JackOfNoneTrades/VintageResourcify/releases)
 [![curse](images/badges/curse.png)](https://www.curseforge.com/minecraft/mc-mods/vintage-resourcify)
 [![67](images/badges/67.png)](https://67.fentanylsolutions.org/mod/vintage-resourcify)
+[![mcmodcn](images/badges/mcmodcn.png)](https://www.mcmod.cn/class/27359.html)
 [![maven](images/badges/maven.png)](https://maven.fentanylsolutions.org/#/releases/dev/dediamondpro/resourcify/VintageResourcify)
 ![forge](images/badges/forge.png)
 [![cord](images/badges/cord.png)](https://discord.gg/xAWCqGrguG)
@@ -17,7 +18,7 @@
 
 <!--
 [![modrinth](images/badges/modrinth.png)](https://modrinth.com/mod/x)
-[![mcmodcn](images/badges/mcmodcn.png)]()-->
+-->
 
 ## Features
 
