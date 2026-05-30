@@ -22,6 +22,8 @@ import dev.dediamondpro.resourcify.VintageResourcify
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiConfirmOpenLink
 import net.minecraft.client.gui.GuiScreen
+import net.minecraft.client.gui.GuiYesNoCallback
+import org.lwjgl.input.Keyboard
 import java.net.URI
 
 /**
@@ -67,27 +69,22 @@ object UrlOpener {
                 // instance.
                 val originalParent = (returnTo as? IMuiScreen)?.screen
                     ?.context?.parentScreen
-                mc.displayGuiScreen(
-                    GuiConfirmOpenLink(
-                        { result, callbackId ->
-                            VintageResourcify.LOG.info(
-                                "UrlOpener confirm result={} callbackId={} url={}",
-                                result, callbackId, url,
-                            )
-                            if (result) openUri(uri)
-                            mc.displayGuiScreen(returnTo)
-                            // After the wrapper is back as currentScreen,
-                            // ClientScreenHandler.onGuiChanged just set its
-                            // parent to the confirm dialog. Overwrite that
-                            // with whatever the parent was before we ever
-                            // showed the confirm - typically the vanilla
-                            // resource pack screen / options menu.
-                            (returnTo as? IMuiScreen)?.screen
-                                ?.context?.setParentScreen(originalParent)
-                        },
-                        url, 0, false,
+                val callback = GuiYesNoCallback { result, callbackId ->
+                    VintageResourcify.LOG.info(
+                        "UrlOpener confirm result={} callbackId={} url={}",
+                        result, callbackId, url,
                     )
-                )
+                    if (result) openUri(uri)
+                    mc.displayGuiScreen(returnTo)
+                    // After the wrapper is back as currentScreen,
+                    // ClientScreenHandler.onGuiChanged just set its parent to
+                    // the confirm dialog. Overwrite that with whatever the
+                    // parent was before we ever showed the confirm - typically
+                    // the vanilla resource pack screen / options menu.
+                    (returnTo as? IMuiScreen)?.screen
+                        ?.context?.setParentScreen(originalParent)
+                }
+                mc.displayGuiScreen(EscapeAwareOpenLinkConfirm(callback, url, 0, false))
             }
         } else {
             openUri(uri)
@@ -126,6 +123,21 @@ object UrlOpener {
             return
         } catch (t: Throwable) {
             VintageResourcify.LOG.error("All URL open methods failed: {}", uri, t)
+        }
+    }
+
+    private class EscapeAwareOpenLinkConfirm(
+        private val callback: GuiYesNoCallback,
+        url: String,
+        private val callbackId: Int,
+        trusted: Boolean,
+    ) : GuiConfirmOpenLink(callback, url, callbackId, trusted) {
+        override fun keyTyped(typedChar: Char, keyCode: Int) {
+            if (keyCode == Keyboard.KEY_ESCAPE) {
+                callback.confirmClicked(false, callbackId)
+                return
+            }
+            super.keyTyped(typedChar, keyCode)
         }
     }
 }
