@@ -125,7 +125,7 @@ object PackOverlayRenderer {
     }
 
     fun lookupPlatform(folder: File, file: File): String? =
-        LocalIndex.forFolder(folder).lookupByFile(file)?.platform
+        LocalIndex.forFolder(folder).lookupByFileName(file)?.platform
 
     /**
      * Draw the platform icon at [x],[y] sized [size]x[size]. Caller picks the

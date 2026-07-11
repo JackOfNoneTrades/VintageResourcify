@@ -47,15 +47,25 @@ class LocalIndex private constructor(private val folder: File) {
     private val file: File = File(folder, INDEX_FILENAME)
     private var data: IndexFile = load()
 
+    /**
+     * Fast lookup for render paths. This must remain free of filesystem I/O:
+     * pack and shader rows call it every frame.
+     */
+    fun lookupByFileName(target: File): Entry? =
+        data.entries.firstOrNull { it.fileName == target.name }
+
+    /**
+     * Resolve an entry by filename, falling back to hashing a renamed file.
+     * The fallback reads the whole file and must not be called from rendering.
+     */
     fun lookupByFile(target: File): Entry? {
-        data.entries.firstOrNull { it.fileName == target.name }?.let { return it }
+        lookupByFileName(target)?.let { return it }
         // Fallback: file may have been renamed manually. Hash-match if we
         // have a recorded sha1. Guard against a non-existent file: vanilla
         // can still hold a list entry for a file that's been deleted
         // out-of-band (e.g. active pack just deleted by the user), and
-        // calling getSha1 on it would spam FileNotFoundException every
-        // frame.
-        if (!target.exists() || !target.isFile) return null
+        // calling getSha1 on it would produce a FileNotFoundException.
+        if (!target.exists() || !target.isFile || data.entries.none { it.sha1 != null }) return null
         val sha = Utils.getSha1(target) ?: return null
         return data.entries.firstOrNull { it.sha1 == sha }
     }
