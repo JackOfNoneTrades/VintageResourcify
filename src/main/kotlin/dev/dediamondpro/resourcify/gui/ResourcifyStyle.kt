@@ -17,6 +17,7 @@ import com.cleanroommc.modularui.widgets.ListWidget
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget
 import cpw.mods.fml.common.eventhandler.SubscribeEvent
 import dev.dediamondpro.resourcify.VintageResourcify
+import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Gui
 import org.lwjgl.input.Keyboard
 import org.fentanylsolutions.fentlib.gui.sodiumgui.SodiumGuiTheme
@@ -128,6 +129,13 @@ object ResourcifyTooltipStyle {
 open class ResourcifyScreen(
     mainPanelCreator: Function<ModularGuiContext, ModularPanel>,
 ) : ModularScreen(VintageResourcify.MODID, mainPanelCreator) {
+    override fun onUpdate() {
+        super.onUpdate()
+        if (Minecraft.getMinecraft().theWorld == null) {
+            VanillaPanoramaBackdrop.update()
+        }
+    }
+
     override fun onKeyPressed(typedChar: Char, keyCode: Int): Boolean {
         if (keyCode != Keyboard.KEY_ESCAPE) {
             return super.onKeyPressed(typedChar, keyCode)
@@ -142,7 +150,11 @@ open class ResourcifyScreen(
     }
 
     override fun drawScreen() {
-        getScreenWrapper().getGuiScreen().drawDefaultBackground()
+        if (Minecraft.getMinecraft().theWorld == null) {
+            VanillaPanoramaBackdrop.draw(getContext().partialTicks)
+        } else {
+            getScreenWrapper().getGuiScreen().drawDefaultBackground()
+        }
         super.drawScreen()
     }
 }
