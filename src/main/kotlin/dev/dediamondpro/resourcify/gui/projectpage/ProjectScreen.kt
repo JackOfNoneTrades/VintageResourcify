@@ -64,6 +64,7 @@ import dev.dediamondpro.resourcify.util.ResourcifySounds
 import dev.dediamondpro.resourcify.util.ShaderGuiHelper
 import dev.dediamondpro.resourcify.util.UrlOpener
 import dev.dediamondpro.resourcify.util.getImageAsync
+import dev.dediamondpro.resourcify.util.localize
 import dev.dediamondpro.resourcify.util.toURL
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Gui
@@ -184,10 +185,10 @@ private class GalleryImageWidget(
         imgW = 0
         imgH = 0
         if (url == null) {
-            setStatus("Invalid gallery image")
+            setStatus(localize("resourcify.gallery.invalid_image"))
             return
         }
-        setStatus("Loading image...")
+        setStatus(localize("resourcify.gallery.loading_image"))
         ensureRequested()
     }
 
@@ -260,7 +261,7 @@ private class GalleryImageWidget(
                     if (error != null || img == null) {
                         VintageResourcify.LOG.warn("Failed to load gallery image {}", url, error)
                         failedUrl = url
-                        setStatus("Failed to load image")
+                        setStatus(localize("resourcify.gallery.failed_image"))
                         return@func_152344_a
                     }
                     adoptImage(url, img)
@@ -270,7 +271,7 @@ private class GalleryImageWidget(
             loadingUrl = null
             failedUrl = url
             VintageResourcify.LOG.warn("Failed to request gallery image {}", url, e)
-            setStatus("Failed to load image")
+            setStatus(localize("resourcify.gallery.failed_image"))
         }
     }
 
@@ -285,7 +286,7 @@ private class GalleryImageWidget(
             setStatus(null)
         } catch (e: Exception) {
             VintageResourcify.LOG.warn("Failed to register gallery image texture {}", url, e)
-            setStatus("Failed to load image")
+            setStatus(localize("resourcify.gallery.failed_image"))
         }
     }
 
@@ -337,7 +338,7 @@ private enum class DownloadPanelState {
 }
 
 private fun formatFileSize(bytes: Long?): String {
-    if (bytes == null || bytes < 0) return "Unknown"
+    if (bytes == null || bytes < 0) return localize("resourcify.common.unknown")
     val units = arrayOf("B", "KiB", "MiB", "GiB")
     var value = bytes.toDouble()
     var unit = 0
@@ -397,10 +398,10 @@ class ProjectScreen(
 
     val descriptionList = SimpleList()
         .sodiumTransparent()
-        .child(TextWidget(IKey.str("Loading description...")).color(accent))
+        .child(TextWidget(IKey.str(localize("resourcify.project.loading_description"))).color(accent))
     val versionsList = SimpleList()
         .sodiumTransparent()
-        .child(TextWidget(IKey.str("Loading versions...")).color(accent))
+        .child(TextWidget(IKey.str(localize("resourcify.project.loading_versions"))).color(accent))
     val versionFilterHolder = Container()
         .sodiumTransparent()
     val selectedMcVersion = arrayOf<String?>(initialMcVersion)
@@ -424,13 +425,17 @@ class ProjectScreen(
     val downloadPanelTop = (sr0.scaledHeight - downloadPanelH) / 2
     val downloadTextW = downloadPanelW - 2 * DOWNLOAD_PANEL_PAD - 8
     val isShader = type == ProjectType.IRIS_SHADER || type == ProjectType.OPTIFINE_SHADER
-    val manageScreenLabel = if (isShader) "Go to Shaders" else "Go to Resource Packs"
+    val manageScreenLabel = if (isShader) {
+        localize("resourcify.download.go_to_shaders")
+    } else {
+        localize("resourcify.download.go_to_resource_packs")
+    }
 
     lateinit var downloadOverlay: Container
     lateinit var downloadChangelogList: SimpleList
     val selectedDownloadVersion = arrayOf<IVersion?>(null)
     val downloadState = arrayOf(DownloadPanelState.READY)
-    val downloadStatus = arrayOf("Ready to download")
+    val downloadStatus = arrayOf(localize("resourcify.download.ready"))
     val downloadUrl = arrayOf<URL?>(null)
     val downloadedFile = arrayOf<File?>(null)
     val downloadButtonHolder = arrayOf<SimpleButton?>(null)
@@ -482,9 +487,10 @@ class ProjectScreen(
         when {
             error != null || result == DownloadResult.FAILED -> {
                 VintageResourcify.LOG.warn("Download failed for {}", version.getFileName(), error)
-                setDownloadState(DownloadPanelState.FAILED, "Download failed")
+                setDownloadState(DownloadPanelState.FAILED, localize("resourcify.download.failed"))
             }
-            result == DownloadResult.CANCELLED -> setDownloadState(DownloadPanelState.CANCELLED, "Download cancelled")
+            result == DownloadResult.CANCELLED ->
+                setDownloadState(DownloadPanelState.CANCELLED, localize("resourcify.download.cancelled"))
             else -> {
                 try {
                     LocalIndex.forFolder(packsFolder).record(target, platformId, project.getId())
@@ -492,7 +498,7 @@ class ProjectScreen(
                     VintageResourcify.LOG.warn("Failed to record install index entry", e)
                 }
                 downloadedFile[0] = target
-                setDownloadState(DownloadPanelState.DONE, "Download complete")
+                setDownloadState(DownloadPanelState.DONE, localize("resourcify.download.complete"))
                 playDownloadChime()
             }
         }
@@ -501,12 +507,20 @@ class ProjectScreen(
     fun startDownload() {
         if (downloadState[0] == DownloadPanelState.DOWNLOADING) return
         if (!DistributionPolicy.canDownloadFrom(platformId)) {
-            setDownloadState(DownloadPanelState.FAILED, DistributionPolicy.downloadBlockedMessage(platformId))
+            val platformName = if (platformId.isBlank()) {
+                localize("resourcify.download.this_platform")
+            } else {
+                DistributionPolicy.displayPlatform(platformId)
+            }
+            setDownloadState(
+                DownloadPanelState.FAILED,
+                localize("resourcify.download.unavailable", platformName),
+            )
             return
         }
         val version = selectedDownloadVersion[0] ?: return
         val url = version.getDownloadUrl() ?: run {
-            setDownloadState(DownloadPanelState.FAILED, "No download URL")
+            setDownloadState(DownloadPanelState.FAILED, localize("resourcify.download.no_url"))
             return
         }
         if (!packsFolder.exists()) packsFolder.mkdirs()
@@ -514,7 +528,7 @@ class ProjectScreen(
         if (!isShader && target.exists()) Platform.closeResourcePack(target)
         downloadUrl[0] = url
         downloadedFile[0] = target
-        setDownloadState(DownloadPanelState.DOWNLOADING, "Starting download...")
+        setDownloadState(DownloadPanelState.DOWNLOADING, localize("resourcify.download.starting"))
         DownloadManager.download(target, version.getSha1(), url, false)
             .whenComplete { result, error ->
                 Minecraft.getMinecraft().func_152344_a {
@@ -526,13 +540,17 @@ class ProjectScreen(
     fun cancelDownload() {
         if (downloadState[0] != DownloadPanelState.DOWNLOADING) return
         downloadUrl[0]?.let { DownloadManager.cancelDownload(it) }
-        setDownloadState(DownloadPanelState.CANCELLED, "Download cancelled")
+        setDownloadState(DownloadPanelState.CANCELLED, localize("resourcify.download.cancelled"))
     }
 
     fun enableDownloaded(): Boolean {
         val file = downloadedFile[0] ?: return true
         val enabled = if (isShader) ShaderGuiHelper.enableShaderPack(file) else Platform.enableResourcePack(file)
-        downloadStatus[0] = if (enabled) "Enabled" else "Could not enable automatically"
+        downloadStatus[0] = if (enabled) {
+            localize("resourcify.download.enabled")
+        } else {
+            localize("resourcify.download.enable_failed")
+        }
         return true
     }
 
@@ -549,17 +567,17 @@ class ProjectScreen(
 
     fun loadChangelog(version: IVersion) {
         downloadChangelogList.removeAll()
-        downloadChangelogList.child(TextWidget(IKey.str("Loading changelog...")).color(accent))
+        downloadChangelogList.child(TextWidget(IKey.str(localize("resourcify.project.loading_changelog"))).color(accent))
         version.getChangeLog().whenComplete { changelog, error ->
             Minecraft.getMinecraft().func_152344_a {
                 if (selectedDownloadVersion[0] !== version || !downloadOverlay.isValid()) return@func_152344_a
                 downloadChangelogList.removeAll()
                 if (error != null) {
-                    downloadChangelogList.child(TextWidget(IKey.str("Failed to load changelog")).color(accent))
+                    downloadChangelogList.child(TextWidget(IKey.str(localize("resourcify.project.failed_changelog"))).color(accent))
                     return@func_152344_a
                 }
                 if (changelog.isNullOrBlank()) {
-                    downloadChangelogList.child(TextWidget(IKey.str("(no changelog)")).color(accent))
+                    downloadChangelogList.child(TextWidget(IKey.str(localize("resourcify.project.no_changelog"))).color(accent))
                     return@func_152344_a
                 }
                 MarkdownRenderer.render(changelog, downloadTextW).forEach { downloadChangelogList.child(it) }
@@ -571,7 +589,7 @@ class ProjectScreen(
         selectedDownloadVersion[0] = version
         downloadUrl[0] = null
         downloadedFile[0] = null
-        setDownloadState(DownloadPanelState.READY, "Ready to download")
+        setDownloadState(DownloadPanelState.READY, localize("resourcify.download.ready"))
         downloadOverlay.setEnabled(true)
         loadChangelog(version)
     }
@@ -582,8 +600,11 @@ class ProjectScreen(
         val matching = if (selected == null) allVersions[0]
         else allVersions[0].filter { it.getMinecraftVersions().contains(selected) }
         if (matching.isEmpty()) {
-            val label = if (selected == null) "No versions available"
-            else "No $selected versions available"
+            val label = if (selected == null) {
+                localize("resourcify.project.no_versions")
+            } else {
+                localize("resourcify.project.no_versions_for", selected)
+            }
             versionsList.child(TextWidget(IKey.str(label)).color(accent))
             return
         }
@@ -615,7 +636,7 @@ class ProjectScreen(
                     SimpleButton()
                         .size(buttonW, 16).right(buttonRightInset).top(3)
                         .sodiumButton(style)
-                        .overlay(IKey.str("Install"))
+                        .overlay(IKey.str(localize("resourcify.version.install")))
                         .onMousePressed { btn ->
                             if (btn == 0) {
                                 openDownloadPanel(version)
@@ -633,7 +654,7 @@ class ProjectScreen(
                 if (error != null) {
                     VintageResourcify.LOG.warn("Failed to load versions for project {}", project.getId(), error)
                     versionsList.removeAll()
-                    versionsList.child(TextWidget(IKey.str("Failed to load versions")).color(accent))
+                    versionsList.child(TextWidget(IKey.str(localize("resourcify.project.failed_versions"))).color(accent))
                     return@func_152344_a
                 }
                 allVersions[0] = versions
@@ -667,7 +688,7 @@ class ProjectScreen(
                 val button = SimpleButton().widthRel(1f).height(14).top(12).left(0)
                     .sodiumButton(style)
                 button.overlay(IKey.dynamic {
-                    val label = selectedMcVersion[0] ?: "Any version"
+                    val label = selectedMcVersion[0] ?: localize("resourcify.project.any_version")
                     "$label  v"
                 })
                 button.onMousePressed { b ->
@@ -681,7 +702,7 @@ class ProjectScreen(
                     } else false
                 }
                 val options = mutableListOf<Pair<String?, String>>()
-                options.add(null to "Any version")
+                options.add(null to localize("resourcify.project.any_version"))
                 mcVersions.forEach { options.add(it to it) }
                 for ((id, name) in options) {
                     val opt = SimpleButton().widthRel(1f).height(12)
@@ -704,7 +725,7 @@ class ProjectScreen(
                     popup.child(opt)
                 }
                 versionFilterHolder.child(
-                    TextWidget(IKey.str("§7Minecraft version§r")).color(accent)
+                    TextWidget(IKey.str("§7${localize("resourcify.browse.minecraft_version")}§r")).color(accent)
                         .top(0).left(0).widthRel(1f).height(10)
                 )
                 versionFilterHolder.child(button)
@@ -720,11 +741,11 @@ class ProjectScreen(
                 descriptionList.removeAll()
                 if (error != null) {
                     VintageResourcify.LOG.warn("Failed to load description for project {}", project.getId(), error)
-                    descriptionList.child(TextWidget(IKey.str("Failed to load description")).color(accent))
+                    descriptionList.child(TextWidget(IKey.str(localize("resourcify.project.failed_description"))).color(accent))
                     return@func_152344_a
                 }
                 if (rawMd.isBlank()) {
-                    descriptionList.child(TextWidget(IKey.str("(no description)")).color(accent))
+                    descriptionList.child(TextWidget(IKey.str(localize("resourcify.project.no_description"))).color(accent))
                     return@func_152344_a
                 }
                 MarkdownRenderer.render(rawMd, descTextW).forEach { descriptionList.child(it) }
@@ -736,7 +757,11 @@ class ProjectScreen(
     val projectIcon = AsyncIcon(project.getIconUrl(), iconSize).top(GUTTER).left(GUTTER)
     val textLeft = GUTTER + iconSize + 8
     val authorInfoColor = style.textSecondary
-    val authorText = "by ${project.getAuthor()}  •  ${project.getDownloads().formatCompact()} downloads"
+    val authorText = localize(
+        "resourcify.browse.project_stats",
+        project.getAuthor(),
+        project.getDownloads().formatCompact(),
+    )
     val font = Minecraft.getMinecraft().fontRenderer
     val defaultGalleryButtonLeft = GUTTER + descListW + GALLERY_BUTTON_GAP + GALLERY_BUTTON_RIGHT_NUDGE
     val maxGalleryButtonLeft = verColLeft - HEADER_ACTION_BUTTONS_WIDTH - GALLERY_BUTTON_GAP
@@ -793,7 +818,7 @@ class ProjectScreen(
         val images = galleryImages[0].orEmpty()
         if (images.isEmpty()) {
             galleryImage.show(null)
-            setGalleryMessage("No gallery images")
+            setGalleryMessage(localize("resourcify.gallery.no_images"))
             return
         }
         galleryIndex[0] = (index + images.size) % images.size
@@ -803,7 +828,7 @@ class ProjectScreen(
     fun loadGalleryImages() {
         if (galleryLoading) return
         galleryLoading = true
-        setGalleryMessage("Loading gallery...")
+        setGalleryMessage(localize("resourcify.gallery.loading"))
         project.getGalleryImages().whenComplete { images, error ->
             Minecraft.getMinecraft().func_152344_a {
                 galleryLoading = false
@@ -811,7 +836,7 @@ class ProjectScreen(
                 if (error != null || images == null) {
                     VintageResourcify.LOG.warn("Failed to load gallery for {}", project.getId(), error)
                     galleryImages[0] = emptyList()
-                    setGalleryMessage("Failed to load gallery")
+                    setGalleryMessage(localize("resourcify.gallery.failed"))
                     return@func_152344_a
                 }
                 galleryImages[0] = images
@@ -886,7 +911,7 @@ class ProjectScreen(
         .overlay(ResourcePackArrowDrawable(ResourcePackArrowDrawable.Direction.LEFT, false))
         .hoverOverlay(ResourcePackArrowDrawable(ResourcePackArrowDrawable.Direction.LEFT, true))
         .onMousePressed { btn -> if (btn == 0) moveGallery(-1) else false }
-    galleryLeft.tooltip().addLine("Previous image")
+    galleryLeft.tooltip().addLine(localize("resourcify.gallery.previous"))
     val galleryRight = SimpleButton()
         .top(sr0.scaledHeight / 2 - GALLERY_ARROW_SIZE / 2)
         .left(sr0.scaledWidth - GALLERY_OVERLAY_MARGIN - GALLERY_ARROW_SIZE)
@@ -897,7 +922,7 @@ class ProjectScreen(
         .overlay(ResourcePackArrowDrawable(ResourcePackArrowDrawable.Direction.RIGHT, false))
         .hoverOverlay(ResourcePackArrowDrawable(ResourcePackArrowDrawable.Direction.RIGHT, true))
         .onMousePressed { btn -> if (btn == 0) moveGallery(1) else false }
-    galleryRight.tooltip().addLine("Next image")
+    galleryRight.tooltip().addLine(localize("resourcify.gallery.next"))
     galleryOverlay
         .child(galleryBackdrop)
         .child(galleryImage)
@@ -957,7 +982,7 @@ class ProjectScreen(
         .top(downloadButtonTop).left(downloadInnerLeft)
         .size(50, 16)
         .sodiumButton(style)
-        .overlay(IKey.str("Close"))
+        .overlay(IKey.str(localize("resourcify.screens.close")))
         .onMousePressed { btn ->
             if (btn == 0) {
                 closeDownloadPanel()
@@ -972,7 +997,7 @@ class ProjectScreen(
         .overlay(IKey.dynamic {
             if (downloadState[0] == DownloadPanelState.FAILED ||
                 downloadState[0] == DownloadPanelState.CANCELLED
-            ) "Retry" else "Download"
+            ) localize("resourcify.download.retry") else localize("resourcify.download.download")
         })
         .onMousePressed { btn ->
             if (btn == 0) {
@@ -985,7 +1010,7 @@ class ProjectScreen(
         .top(downloadButtonTop).left(downloadPanelLeft + downloadPanelW - DOWNLOAD_PANEL_PAD - 80)
         .size(80, 16)
         .sodiumButton(style)
-        .overlay(IKey.str("Cancel"))
+        .overlay(IKey.str(localize("gui.cancel")))
         .onMousePressed { btn ->
             if (btn == 0) {
                 cancelDownload()
@@ -997,7 +1022,7 @@ class ProjectScreen(
         .top(downloadButtonTop).left(downloadInnerLeft + 56)
         .size(64, 16)
         .sodiumButton(style)
-        .overlay(IKey.str("Enable"))
+        .overlay(IKey.str(localize("resourcify.download.enable")))
         .onMousePressed { btn -> if (btn == 0) enableDownloaded() else false }
     enableButtonHolder[0] = enableDownloadButton
     val manageDownloadButton = SimpleButton()
@@ -1012,7 +1037,7 @@ class ProjectScreen(
         .child(downloadBackdrop)
         .child(downloadPanelBackground)
         .child(
-            TextWidget(IKey.str("Download file").style(EnumChatFormatting.BOLD))
+            TextWidget(IKey.str(localize("resourcify.download.title")).style(EnumChatFormatting.BOLD))
                 .top(downloadPanelTop + DOWNLOAD_PANEL_PAD).left(downloadInnerLeft)
                 .width(downloadTextW).height(12)
                 .color(accent)
@@ -1021,7 +1046,7 @@ class ProjectScreen(
         .child(
             TextWidget(IKey.dynamic {
                 val name = selectedDownloadVersion[0]?.getName() ?: ""
-                "Version: ${trimPanelText(name, downloadTextW - 48)}"
+                localize("resourcify.download.version", trimPanelText(name, downloadTextW - 48))
             })
                 .top(downloadPanelTop + 30).left(downloadInnerLeft)
                 .width(downloadTextW).height(10)
@@ -1031,7 +1056,7 @@ class ProjectScreen(
         .child(
             TextWidget(IKey.dynamic {
                 val fileName = selectedDownloadVersion[0]?.getFileName() ?: ""
-                "File: ${trimPanelText(fileName, downloadTextW - 30)}"
+                localize("resourcify.download.file", trimPanelText(fileName, downloadTextW - 30))
             })
                 .top(downloadPanelTop + 42).left(downloadInnerLeft)
                 .width(downloadTextW).height(10)
@@ -1040,7 +1065,7 @@ class ProjectScreen(
         )
         .child(
             TextWidget(IKey.dynamic {
-                "Size: ${formatFileSize(selectedDownloadVersion[0]?.getFileSize())}"
+                localize("resourcify.download.size", formatFileSize(selectedDownloadVersion[0]?.getFileSize()))
             })
                 .top(downloadPanelTop + 54).left(downloadInnerLeft)
                 .width(downloadTextW).height(10)
@@ -1048,7 +1073,7 @@ class ProjectScreen(
                 .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
         )
         .child(
-            TextWidget(IKey.str("Changelog").style(EnumChatFormatting.BOLD))
+            TextWidget(IKey.str(localize("resourcify.updates.changelog")).style(EnumChatFormatting.BOLD))
                 .top(downloadPanelTop + 70).left(downloadInnerLeft)
                 .width(downloadTextW).height(10)
                 .color(accent)
@@ -1092,7 +1117,7 @@ class ProjectScreen(
                 true
             } else false
         }
-    galleryButton.tooltip().addLine("View Gallery")
+    galleryButton.tooltip().addLine(localize("resourcify.gallery.view"))
 
     val websiteButton = SimpleButton()
         .top(GUTTER + 16)
@@ -1107,7 +1132,7 @@ class ProjectScreen(
                 true
             } else false
         }
-    websiteButton.tooltip().addLine("Open Project Page")
+    websiteButton.tooltip().addLine(localize("resourcify.project.open_page"))
 
     val closeButton = SimpleButton()
         .top(CLOSE_BUTTON_TOP).right(CLOSE_BUTTON_RIGHT).size(CLOSE_BUTTON_SIZE, CLOSE_BUTTON_SIZE)
@@ -1121,9 +1146,9 @@ class ProjectScreen(
                 true
             } else false
         }
-    closeButton.tooltip().addLine("Close")
+    closeButton.tooltip().addLine(localize("resourcify.screens.close"))
 
-    val versionsHeader = TextWidget(IKey.str("Versions").style(EnumChatFormatting.BOLD))
+    val versionsHeader = TextWidget(IKey.str(localize("resourcify.project.versions")).style(EnumChatFormatting.BOLD))
         .top(bodyTop).left(verColLeft).width(verColW).height(14)
         .color(accent)
         .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)

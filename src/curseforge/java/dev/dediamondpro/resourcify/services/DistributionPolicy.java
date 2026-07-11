@@ -27,7 +27,7 @@ public final class DistributionPolicy {
             .toLowerCase(Locale.ROOT);
     }
 
-    private static String displayPlatform(String platformId) {
+    public static String displayPlatform(String platformId) {
         if (platformId == null || platformId.trim()
             .isEmpty()) {
             return "this platform";

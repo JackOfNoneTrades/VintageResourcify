@@ -20,7 +20,7 @@ public final class DistributionPolicy {
         return "Downloads from " + displayPlatform(platformId) + " unavailable in this build";
     }
 
-    private static String displayPlatform(String platformId) {
+    public static String displayPlatform(String platformId) {
         if (platformId == null || platformId.trim()
             .isEmpty()) {
             return "this platform";

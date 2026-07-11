@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.resources.I18n;
 
 import cpw.mods.fml.client.config.ConfigGuiType;
 import cpw.mods.fml.client.config.DummyConfigElement;
@@ -23,7 +24,7 @@ import dev.dediamondpro.resourcify.config.Config;
 public class ResourcifyConfigGui extends GuiConfig {
 
     public ResourcifyConfigGui(GuiScreen parent) {
-        super(parent, buildElements(), VintageResourcify.MODID, false, false, "VintageResourcify Settings");
+        super(parent, buildElements(), VintageResourcify.MODID, false, false, I18n.format("resourcify.config.title"));
     }
 
     private static List<IConfigElement> buildElements() {

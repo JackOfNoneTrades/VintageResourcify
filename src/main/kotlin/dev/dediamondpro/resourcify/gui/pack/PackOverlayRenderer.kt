@@ -23,6 +23,7 @@ import dev.dediamondpro.resourcify.util.ClientGuiTasks
 import dev.dediamondpro.resourcify.util.LocalIndex
 import dev.dediamondpro.resourcify.util.ResourcifySounds
 import dev.dediamondpro.resourcify.util.ShaderGuiHelper
+import dev.dediamondpro.resourcify.util.localize
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Gui
 import net.minecraft.client.renderer.OpenGlHelper
@@ -184,7 +185,7 @@ object PackOverlayRenderer {
         }
         // Capture hover so the host drawScreen can paint the tooltip on top.
         if (mouseX in x..(x + size) && mouseY in y..(y + size)) {
-            pendingTooltipText = "Source: ${displayName(platform)}"
+            pendingTooltipText = localize("resourcify.pack.source_tooltip", displayName(platform))
             pendingTooltipX = mouseX
             pendingTooltipY = mouseY
         }
@@ -284,7 +285,7 @@ object PackOverlayRenderer {
         }
         scratch.add(DeleteRegion(x, y, x + size, y + size, folder, file, displayName))
         if (hovered) {
-            pendingTooltipText = "Delete $displayName"
+            pendingTooltipText = localize("resourcify.pack.delete_tooltip", displayName)
             pendingTooltipX = mouseX
             pendingTooltipY = mouseY
         }
@@ -329,8 +330,8 @@ object PackOverlayRenderer {
         mc.displayGuiScreen(
             net.minecraft.client.gui.GuiYesNo(
                 confirm,
-                "Delete '${hit.displayName}'?",
-                "This will remove the file from disk.",
+                localize("resourcify.pack.delete_confirm", hit.displayName),
+                localize("resourcify.pack.delete_warning"),
                 0,
             )
         )

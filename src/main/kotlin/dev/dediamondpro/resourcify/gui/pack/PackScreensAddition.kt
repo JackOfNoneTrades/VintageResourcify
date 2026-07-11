@@ -34,6 +34,7 @@ import dev.dediamondpro.resourcify.util.DownloadResult
 import dev.dediamondpro.resourcify.util.LocalIndex
 import dev.dediamondpro.resourcify.util.ResourcifySounds
 import dev.dediamondpro.resourcify.util.ShaderGuiHelper
+import dev.dediamondpro.resourcify.util.localize
 import net.minecraft.client.Minecraft
 import net.minecraft.client.audio.PositionedSoundRecord
 import net.minecraft.client.gui.Gui
@@ -269,34 +270,35 @@ object PackScreensAddition {
     }
 
     private fun pickAndCopyPackFile(type: ProjectType, folder: File) {
-        showToast("Select a zip file...", durationMs = 4_000)
+        showToast(localize("resourcify.pack.select_zip"), durationMs = 4_000)
         Thread({
             val result = try {
-                FileUtil.pickFile("Select pack zip", FileUtil.getDefaultFileSelectionDirectory(), "zip")
+                FileUtil.pickFile(localize("resourcify.pack.select_zip_title"), FileUtil.getDefaultFileSelectionDirectory(), "zip")
             } catch (e: Throwable) {
                 VintageResourcify.LOG.warn("File picker failed", e)
-                showToast("File picker failed", durationMs = 5_000)
+                showToast(localize("resourcify.pack.file_picker_failed"), durationMs = 5_000)
                 return@Thread
             }
             when (result.status) {
                 FileUtil.FilePickerResult.Status.SELECTED -> {
                     val source = result.file
                     if (source == null) {
-                        showToast("No file selected", durationMs = 4_000)
+                        showToast(localize("resourcify.pack.no_file_selected"), durationMs = 4_000)
                         return@Thread
                     }
                     copyPickedPackFile(type, resolveImportFolder(type, folder), source)
                 }
-                FileUtil.FilePickerResult.Status.CANCELLED -> showToast("Import cancelled", durationMs = 3_000)
+                FileUtil.FilePickerResult.Status.CANCELLED ->
+                    showToast(localize("resourcify.pack.import_cancelled"), durationMs = 3_000)
                 FileUtil.FilePickerResult.Status.UNAVAILABLE,
                 FileUtil.FilePickerResult.Status.ERROR ->
-                    showToast(result.message ?: "File picker failed", durationMs = 6_000)
+                    showToast(localize("resourcify.pack.file_picker_failed"), durationMs = 6_000)
             }
         }, "Resourcify-PackFilePicker").apply { isDaemon = true }.start()
     }
 
     fun importPackFile(type: ProjectType, folder: File, source: File) {
-        showToast("Importing ${source.name}...", durationMs = 5_000)
+        showToast(localize("resourcify.pack.importing", source.name), durationMs = 5_000)
         Thread({
             copyPickedPackFile(type, resolveImportFolder(type, folder), source)
         }, "Resourcify-PackFileImport").apply { isDaemon = true }.start()
@@ -305,17 +307,17 @@ object PackScreensAddition {
     private fun copyPickedPackFile(type: ProjectType, folder: File, source: File) {
         try {
             if (!source.isFile || !source.canRead()) {
-                showToast("Import failed", durationMs = 5_000)
+                showToast(localize("resourcify.pack.import_failed"), durationMs = 5_000)
                 return
             }
             if (!source.name.endsWith(".zip", ignoreCase = true)) {
-                showToast("Only zip files are supported", durationMs = 5_000)
+                showToast(localize("resourcify.pack.zip_only"), durationMs = 5_000)
                 return
             }
             if (!folder.exists()) folder.mkdirs()
             val target = File(folder, targetFileName(source.name))
             if (sameFile(source, target)) {
-                showToast("File is already in this folder", durationMs = 4_000)
+                showToast(localize("resourcify.pack.already_in_folder"), durationMs = 4_000)
                 runClientSync { refreshHostPackScreen(type) }
                 return
             }
@@ -329,14 +331,14 @@ object PackScreensAddition {
             }
             VintageResourcify.LOG.info("Importing pack file {} to {}", source, target)
             Files.copy(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
-            showToast("Imported ${target.name}", durationMs = 5_000)
+            showToast(localize("resourcify.pack.imported", target.name), durationMs = 5_000)
             runClientSync {
                 playImportChime()
                 refreshHostPackScreen(type)
             }
         } catch (e: Throwable) {
             VintageResourcify.LOG.warn("Could not import pack file {}", source, e)
-            showToast("Import failed", durationMs = 5_000)
+            showToast(localize("resourcify.pack.import_failed"), durationMs = 5_000)
         }
     }
 
@@ -367,7 +369,7 @@ object PackScreensAddition {
             updateScroll = 0
         }
         if (openPanel) {
-            updateStatusText = "Checking for updates..."
+            updateStatusText = localize("resourcify.updates.checking")
         }
         Thread({
             try {
@@ -378,9 +380,12 @@ object PackScreensAddition {
                     updateScroll = 0
                 }
                 updateStatusText = if (found.isEmpty()) {
-                    "All tracked packs are up to date"
+                    localize("resourcify.pack_updates.all_up_to_date")
                 } else {
-                    "${found.size} update${if (found.size == 1) "" else "s"} available"
+                    localize(
+                        if (found.size == 1) "resourcify.pack_updates.available.one" else "resourcify.pack_updates.available.many",
+                        found.size,
+                    )
                 }
                 val chimeGroup = updateChimeGroup(type)
                 val chimeHash = found.takeIf { it.isNotEmpty() }?.let { updateSetHash(it) }
@@ -389,8 +394,8 @@ object PackScreensAddition {
                 }
             } catch (e: Throwable) {
                 VintageResourcify.LOG.warn("Update check failed for {}", folder, e)
-                updateStatusText = "Update check failed"
-                if (openPanel) showToast("Update check failed", durationMs = 5_000)
+                updateStatusText = localize("resourcify.pack_updates.check_failed")
+                if (openPanel) showToast(localize("resourcify.pack_updates.check_failed"), durationMs = 5_000)
             } finally {
                 checkInProgress = false
             }
@@ -443,10 +448,10 @@ object PackScreensAddition {
         Gui.drawRect(0, 0, screen.width, screen.height, UPDATE_SCREEN_SCRIM)
         Gui.drawRect(panelX, panelY, panelX + panelW, panelY + panelH, style.panel)
 
-        fr.drawString("Available updates", panelX + PANEL_PADDING, panelY + 8, style.textPrimary, false)
+        fr.drawString(localize("resourcify.pack_updates.title"), panelX + PANEL_PADDING, panelY + 8, style.textPrimary, false)
         val status = when {
             updateInProgress -> updateStatusText
-            checkInProgress -> "Checking for updates..."
+            checkInProgress -> localize("resourcify.updates.checking")
             else -> updateStatusText
         }
         if (status.isNotBlank()) {
@@ -465,7 +470,11 @@ object PackScreensAddition {
         beginScissor(listX, listY, listW, listH, screen)
         try {
             if (entries.isEmpty()) {
-                val text = if (checkInProgress) "Checking..." else "No updates available"
+                val text = if (checkInProgress) {
+                    localize("resourcify.pack_updates.checking_short")
+                } else {
+                    localize("resourcify.pack_updates.none_available")
+                }
                 fr.drawString(text, listX + 8, listY + 8, style.textSecondary, false)
             } else {
                 val first = updateScroll
@@ -491,7 +500,7 @@ object PackScreensAddition {
                 buttonY,
                 cancelW,
                 TEXT_BUTTON_HEIGHT,
-                "Cancel",
+                localize("gui.cancel"),
                 enabled = true,
                 hover = isInside(mouseX, mouseY, panelX + panelW - PANEL_PADDING - cancelW, buttonY, cancelW, TEXT_BUTTON_HEIGHT),
                 style = style,
@@ -504,7 +513,7 @@ object PackScreensAddition {
                 buttons.y,
                 buttons.updateAllW,
                 TEXT_BUTTON_HEIGHT,
-                "Update All",
+                localize("resourcify.updates.update_all"),
                 enabled = canUpdate,
                 hover = canUpdate && isInside(mouseX, mouseY, buttons.updateAllX, buttons.y, buttons.updateAllW, TEXT_BUTTON_HEIGHT),
                 style = style,
@@ -524,7 +533,7 @@ object PackScreensAddition {
                 buttons.y,
                 buttons.closeW,
                 TEXT_BUTTON_HEIGHT,
-                "Close",
+                localize("resourcify.screens.close"),
                 enabled = true,
                 hover = isInside(mouseX, mouseY, buttons.closeX, buttons.y, buttons.closeW, TEXT_BUTTON_HEIGHT),
                 style = style,
@@ -547,7 +556,7 @@ object PackScreensAddition {
         val textW = buttonX - x - 12
 
         fr.drawString(trimToWidth(fr, entry.oldFile.name, textW), x + 6, y + 5, style.textPrimary, false)
-        val version = "to ${versionLabel(entry.version)}"
+        val version = localize("resourcify.pack_updates.to_version", versionLabel(entry.version))
         fr.drawString(trimToWidth(fr, version, textW), x + 6, y + 17, style.textSecondary, false)
 
         val status = statusLabel(entry)
@@ -566,7 +575,7 @@ object PackScreensAddition {
             mouseX,
             mouseY,
             enabled = buttonEnabled,
-            tooltip = "Update".takeIf { buttonEnabled },
+            tooltip = localize("resourcify.updates.update").takeIf { buttonEnabled },
         )
     }
 
@@ -588,7 +597,7 @@ object PackScreensAddition {
             if (isInside(mouseX, mouseY, cancelX, cancelY, cancelW, TEXT_BUTTON_HEIGHT)) {
                 playDefaultButtonSound()
                 updateCancelRequested = true
-                updateStatusText = "Cancelling..."
+                updateStatusText = localize("resourcify.pack_updates.cancelling")
                 currentDownloadUrl?.let { DownloadManager.cancelDownload(it) }
                 activeDownload?.cancel(false)
             }
@@ -651,7 +660,7 @@ object PackScreensAddition {
         updateCancelRequested = false
         updateTotal = entries.size
         updateCompleted = 0
-        updateStatusText = "Updating 0/${entries.size}..."
+        updateStatusText = localize("resourcify.pack_updates.progress", 0, entries.size)
 
         val prepared = entries.map { entry ->
             val wasEnabled = when (type) {
@@ -669,7 +678,12 @@ object PackScreensAddition {
             for (item in prepared) {
                 if (updateCancelRequested) break
                 item.entry.status = UpdateStatus.UPDATING
-                updateStatusText = "Updating ${updateCompleted}/${updateTotal}: ${item.entry.oldFile.name}"
+                updateStatusText = localize(
+                    "resourcify.pack_updates.progress_file",
+                    updateCompleted,
+                    updateTotal,
+                    item.entry.oldFile.name,
+                )
                 val result = performUpdate(item, type, folder)
                 item.entry.status = result
                 when (result) {
@@ -685,9 +699,10 @@ object PackScreensAddition {
             activeDownload = null
             updateInProgress = false
             updateStatusText = when {
-                cancelled > 0 -> "Cancelled after $updateCompleted/${updateTotal}"
-                failed > 0 -> "Updated $updated, failed $failed"
-                else -> "Updated $updated pack${if (updated == 1) "" else "s"}"
+                cancelled > 0 -> localize("resourcify.pack_updates.cancelled_after", updateCompleted, updateTotal)
+                failed > 0 -> localize("resourcify.pack_updates.result_failed", updated, failed)
+                updated == 1 -> localize("resourcify.pack_updates.result.one", updated)
+                else -> localize("resourcify.pack_updates.result.many", updated)
             }
             if (updated > 0 && (prepared.size == 1 || cancelled == 0)) {
                 runClientSync { playDownloadChime() }
@@ -874,7 +889,7 @@ object PackScreensAddition {
             updateAllW = updateAllW,
             checkX = checkX,
             checkW = checkW,
-            checkLabel = if (compact) "Check" else "Check Updates",
+            checkLabel = localize(if (compact) "resourcify.pack_updates.check" else "resourcify.pack_updates.check_updates"),
             closeX = closeX,
             closeW = closeW,
             y = y,
@@ -928,10 +943,10 @@ object PackScreensAddition {
     private fun statusLabel(entry: UpdateEntry): String {
         return when (entry.status) {
             UpdateStatus.PENDING -> fileSizeLabel(entry.version.getFileSize())
-            UpdateStatus.UPDATING -> "Updating"
-            UpdateStatus.UPDATED -> "Updated"
-            UpdateStatus.FAILED -> "Failed"
-            UpdateStatus.CANCELLED -> "Cancelled"
+            UpdateStatus.UPDATING -> localize("resourcify.pack_updates.status.updating")
+            UpdateStatus.UPDATED -> localize("resourcify.pack_updates.status.updated")
+            UpdateStatus.FAILED -> localize("resourcify.pack_updates.status.failed")
+            UpdateStatus.CANCELLED -> localize("resourcify.pack_updates.status.cancelled")
         }
     }
 
@@ -1019,7 +1034,7 @@ object PackScreensAddition {
         setPanelContext(type, folder)
         updatePanelOpen = true
         if (updateStatusText.isBlank()) {
-            updateStatusText = "Checking for updates..."
+            updateStatusText = localize("resourcify.updates.checking")
         }
     }
 
@@ -1058,18 +1073,18 @@ object PackScreensAddition {
     }
 
     private fun browseTooltip(type: ProjectType): String {
-        return if (isShaderType(type)) "Browse Shaders" else "Browse Resource Packs"
+        return localize(if (isShaderType(type)) "resourcify.pack.browse_shaders" else "resourcify.pack.browse_resource_packs")
     }
 
     private fun importTooltip(type: ProjectType): String {
-        return if (isShaderType(type)) "Import Shader Pack" else "Import Resource Pack"
+        return localize(if (isShaderType(type)) "resourcify.pack.import_shader" else "resourcify.pack.import_resource")
     }
 
     private fun updateTooltip(type: ProjectType, folder: File): String {
         return when {
-            checkInProgress && matchesPanel(type, folder) -> "Checking Updates"
-            badgeCount(type, folder) > 0 -> "View Updates"
-            else -> "Check Updates"
+            checkInProgress && matchesPanel(type, folder) -> localize("resourcify.pack_updates.checking_updates")
+            badgeCount(type, folder) > 0 -> localize("resourcify.pack_updates.view_updates")
+            else -> localize("resourcify.pack_updates.check_updates")
         }
     }
 

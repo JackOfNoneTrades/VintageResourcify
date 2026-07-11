@@ -50,6 +50,7 @@ import dev.dediamondpro.resourcify.services.ServiceRegistry
 import dev.dediamondpro.resourcify.util.AsyncIcon
 import dev.dediamondpro.resourcify.util.ClientGuiTasks
 import dev.dediamondpro.resourcify.util.formatCompact
+import dev.dediamondpro.resourcify.util.localize
 import dev.dediamondpro.resourcify.util.MultiThreading
 import dev.dediamondpro.resourcify.util.ShaderGuiHelper
 import net.minecraft.client.Minecraft
@@ -100,7 +101,7 @@ class BrowseScreen(
             }
             return super.onKeyPressed(character, keyCode)
         }
-    }.sodiumTextField(style).hintText("Search...")
+    }.sodiumTextField(style).hintText(localize("resourcify.browse.search.placeholder"))
     val resultsList = SimpleList()
     val filtersList = SimpleList()
     // Holds the "Filters" + "Minecraft version" labels and the actual
@@ -153,11 +154,11 @@ class BrowseScreen(
             // change, Enter, button, type switch, initial load).
             lastObservedText = currentQuery
             lastKeystrokeMs = -1L
-            resultsList.child(TextWidget(IKey.str("Searching...")).color(style.textSecondary))
+            resultsList.child(TextWidget(IKey.str(localize("resourcify.browse.searching"))).color(style.textSecondary))
         } else {
             loadMoreBtn?.let { resultsList.remove(it) }
             loadMoreBtn = null
-            val loadingMore = TextWidget(IKey.str("Loading more...")).color(style.textSecondary)
+            val loadingMore = TextWidget(IKey.str(localize("resourcify.browse.loading_more"))).color(style.textSecondary)
             resultsList.child(loadingMore)
             loadMoreBtn = loadingMore
         }
@@ -187,7 +188,7 @@ class BrowseScreen(
                 val projects: List<IProject> = result?.projects ?: emptyList()
                 totalCount = result?.totalCount ?: loadedCount
                 if (loadedCount == 0 && projects.isEmpty()) {
-                    resultsList.child(TextWidget(IKey.str("No results")).color(style.textSecondary))
+                    resultsList.child(TextWidget(IKey.str(localize("resourcify.browse.no_results"))).color(style.textSecondary))
                     return@func_152344_a
                 }
                 val platformIdAtRequest = service.getPlatformId()
@@ -205,7 +206,7 @@ class BrowseScreen(
                         // under the scrollbar track.
                         .left(0).right(10).height(20).margin(0, 0, 0, CARD_GAP)
                         .sodiumButton(style)
-                        .overlay(IKey.str("Load more (${loadedCount}/${totalCount})"))
+                        .overlay(IKey.str(localize("resourcify.browse.load_more", loadedCount, totalCount)))
                         .onMousePressed { b -> if (b == 0) { loadPage(append = true); true } else false }
                     resultsList.child(btn)
                     loadMoreBtn = btn
@@ -227,8 +228,8 @@ class BrowseScreen(
         if (selected) "§f§n$label§r" else "§7$label§r"
 
     fun refreshTabLabels() {
-        packsTab.overlay(IKey.str(tabLabel("Resource Packs", currentType == ProjectType.RESOURCE_PACK)))
-        shadersTab.overlay(IKey.str(tabLabel("Shaders", currentType == ProjectType.IRIS_SHADER)))
+        packsTab.overlay(IKey.str(tabLabel(localize("resourcify.browse.tab.resource_packs"), currentType == ProjectType.RESOURCE_PACK)))
+        shadersTab.overlay(IKey.str(tabLabel(localize("resourcify.browse.tab.shaders"), currentType == ProjectType.IRIS_SHADER)))
     }
     refreshTabLabels()
 
@@ -264,14 +265,14 @@ class BrowseScreen(
         filtersList.removeAll()
         versionDropdownHolder.removeAll()
         versionDropdownHolder.child(
-            TextWidget(IKey.str("§lFilters§r")).color(style.textPrimary).top(0).left(0).widthRel(1f).height(10)
+            TextWidget(IKey.str("§l${localize("resourcify.browse.filters")}§r")).color(style.textPrimary).top(0).left(0).widthRel(1f).height(10)
         )
 
         // Platform dropdown: same shape as the MC-version one below. Picking
         // a new platform throws away the current filter state (its categories
         // and sort keys are platform-specific) and reloads.
         versionDropdownHolder.child(
-            TextWidget(IKey.str("§lPlatform§r")).color(style.textPrimary).top(12).left(0).widthRel(1f).height(10)
+            TextWidget(IKey.str("§l${localize("resourcify.browse.platform")}§r")).color(style.textPrimary).top(12).left(0).widthRel(1f).height(10)
         )
         val availableServices = ServiceRegistry.getServices(currentType)
         val platformPopup = SimpleList()
@@ -326,7 +327,7 @@ class BrowseScreen(
         versionDropdownHolder.child(platformPopup)
 
         versionDropdownHolder.child(
-            TextWidget(IKey.str("§lMinecraft version§r")).color(style.textPrimary).top(42).left(0).widthRel(1f).height(10)
+            TextWidget(IKey.str("§l${localize("resourcify.browse.minecraft_version")}§r")).color(style.textPrimary).top(42).left(0).widthRel(1f).height(10)
         )
 
         // Custom dropdown: a label button + a hidden ListWidget popup. We
@@ -335,7 +336,7 @@ class BrowseScreen(
         // with null scroll data and never gains real scroll behaviour, so
         // any version list past ~10 entries simply gets clipped. ListWidget
         // does initialise scroll data in onInit, so this popup scrolls.
-        val versionPlaceholder = TextWidget(IKey.str("§7Loading versions...§r")).color(style.textSecondary)
+        val versionPlaceholder = TextWidget(IKey.str("§7${localize("resourcify.project.loading_versions")}§r")).color(style.textSecondary)
             .top(54).left(0).widthRel(1f).height(14)
         versionDropdownHolder.child(versionPlaceholder)
         val typeAtVersions = currentType
@@ -410,7 +411,7 @@ class BrowseScreen(
         // Sort group: synchronous list from the service.
         val sortOptions = service.getSortOptions()
         if (sortOptions.isNotEmpty()) {
-            filtersList.child(TextWidget(IKey.str("§lSort by§r")).color(style.textPrimary).margin(0, 2, 0, 2))
+            filtersList.child(TextWidget(IKey.str("§l${localize("resourcify.browse.sort_by")}§r")).color(style.textPrimary).margin(0, 2, 0, 2))
             for ((id, label) in sortOptions) {
                 sortNames[id] = label
                 val pill = filterPill(id, label, { id == currentSort }) { currentSort = id }
@@ -420,7 +421,7 @@ class BrowseScreen(
 
         // Categories: async because services may need a network round-trip
         // (Modrinth caches the tag dump). Show a loading line until ready.
-        val loadingMarker = TextWidget(IKey.str("§7Loading categories...§r")).color(style.textSecondary).margin(0, 4, 0, 2)
+        val loadingMarker = TextWidget(IKey.str("§7${localize("resourcify.browse.loading_categories")}§r")).color(style.textSecondary).margin(0, 4, 0, 2)
         filtersList.child(loadingMarker)
         val typeAtRequest = currentType
         val serviceAtRequest = service
@@ -429,7 +430,7 @@ class BrowseScreen(
                 if (typeAtRequest != currentType || serviceAtRequest !== service) return@func_152344_a
                 filtersList.remove(loadingMarker)
                 if (groups.isEmpty()) {
-                    filtersList.child(TextWidget(IKey.str("§7(no categories)§r")).color(style.textSecondary))
+                    filtersList.child(TextWidget(IKey.str("§7${localize("resourcify.browse.no_categories")}§r")).color(style.textSecondary))
                     return@func_152344_a
                 }
                 for ((groupName, members) in groups) {
@@ -495,7 +496,7 @@ class BrowseScreen(
                 true
             } else false
         }
-    closeButton.tooltip().addLine("Close")
+    closeButton.tooltip().addLine(localize("resourcify.screens.close"))
 
     // Search fires automatically on idle via the tick-driven debounce below;
     // Enter still triggers an immediate search through searchBox's key handler.
@@ -531,7 +532,7 @@ class BrowseScreen(
         .sodiumTransparent()
     resultsList.top(50).left(140).right(10).bottom(10)
         .sodiumTransparent()
-        .child(TextWidget(IKey.str("Loading...")).color(style.textSecondary))
+        .child(TextWidget(IKey.str(localize("resourcify.common.loading"))).color(style.textSecondary))
     rebuildFilters()
     loadPage(append = false)
 
@@ -658,7 +659,11 @@ private fun buildCard(
     } else rawTitle
     // Author + downloads: same hard single-line treatment as the title. The
     // row uses a dynamic color so it stays readable on the hovered card.
-    val rawAuthor = "by ${project.getAuthor()}  •  ${project.getDownloads().formatCompact()} downloads"
+    val rawAuthor = localize(
+        "resourcify.browse.project_stats",
+        project.getAuthor(),
+        project.getDownloads().formatCompact(),
+    )
     val authorLine = if (fr != null && fr.getStringWidth(rawAuthor) > summaryW) {
         fr.trimStringToWidth(rawAuthor, (summaryW - fr.getStringWidth("...")).coerceAtLeast(20)) + "..."
     } else rawAuthor
