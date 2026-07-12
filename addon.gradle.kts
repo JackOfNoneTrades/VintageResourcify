@@ -88,6 +88,21 @@ gradle.allprojects {
     buildscript.repositories.keepFentMavenFirst()
 }
 
+// commonmark 0.22+ targets Java 11. Transform only this dependency to Java 8;
+// VintageResourcify itself stays on the normal Jabel/Java 8 build path.
+plugins.apply(xyz.wagyourtail.jvmdg.gradle.JVMDowngraderPlugin::class.java)
+val downgradedCommonmark = configurations.create("downgradedCommonmark") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+dependencies.add(downgradedCommonmark.name, "org.commonmark:commonmark:0.29.0")
+extensions.configure<xyz.wagyourtail.jvmdg.gradle.JVMDowngraderExtension>("jvmdg") {
+    downgradeTo.set(JavaVersion.VERSION_1_8)
+    dg(downgradedCommonmark, shade = false)
+}
+dependencies.add("compileOnly", "org.commonmark:commonmark:0.29.0")
+dependencies.add("shadowImplementation", files(downgradedCommonmark))
+
 val curseForgeLimitedMessage =
     "This CurseForge build only supports downloads from Modrinth and CurseForge."
 val configuredCurseForgeProjectId = providers.gradleProperty("curseForgeProjectId")
@@ -142,7 +157,7 @@ val curseForgeJar = tasks.register<Jar>("curseForgeJar") {
     group = "build"
     description = "Assembles a CurseForge-specific dev jar that only enables Modrinth and CurseForge downloads."
 
-    val normalJar = tasks.named<Jar>("jar")
+    val normalJar = tasks.named<AbstractArchiveTask>("shadowJar")
 
     dependsOn(normalJar, tasks.named(curseForgeReplacementSourceSet.classesTaskName), generateCurseForgeMcmodInfo)
     archiveClassifier.set("curseforge-dev")

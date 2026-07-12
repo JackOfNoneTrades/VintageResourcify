@@ -26,8 +26,6 @@ dependencies {
 
     implementation("org.fentanylsolutions.fentlib:FentLib:0.0.52:dev")
 
-    shadowImplementation("org.commonmark:commonmark:0.29.0")
-
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:NotEnoughItems:2.8.112-GTNH:dev")
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:GTNHLib:0.11.28:dev") { transitive = false }
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:Hodgepodge:2.7.171:dev")

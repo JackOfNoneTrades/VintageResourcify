@@ -742,13 +742,33 @@ class ProjectScreen(
                 if (error != null) {
                     VintageResourcify.LOG.warn("Failed to load description for project {}", project.getId(), error)
                     descriptionList.child(TextWidget(IKey.str(localize("resourcify.project.failed_description"))).color(accent))
-                    return@func_152344_a
-                }
-                if (rawMd.isBlank()) {
+                } else if (rawMd.isBlank()) {
+                    VintageResourcify.LOG.info("Project {} returned an empty description", project.getId())
                     descriptionList.child(TextWidget(IKey.str(localize("resourcify.project.no_description"))).color(accent))
-                    return@func_152344_a
+                } else {
+                    try {
+                        val widgets = MarkdownRenderer.render(rawMd, descTextW)
+                        widgets.forEach { descriptionList.child(it) }
+                        VintageResourcify.LOG.info(
+                            "Rendered {} description characters for project {} into {} widgets",
+                            rawMd.length,
+                            project.getId(),
+                            widgets.size,
+                        )
+                    } catch (t: Throwable) {
+                        VintageResourcify.LOG.error("Failed to render description for project {}", project.getId(), t)
+                        descriptionList.child(
+                            TextWidget(IKey.str(localize("resourcify.project.failed_description"))).color(accent)
+                        )
+                    }
                 }
-                MarkdownRenderer.render(rawMd, descTextW).forEach { descriptionList.child(it) }
+
+                // The request can complete after the panel's initial layout (especially on Java 8).
+                // Recalculate the list so asynchronously-added children receive bounds and become visible.
+                val panel = descriptionList.panel
+                if (panel != null && panel.isValid) {
+                    com.cleanroommc.modularui.widget.WidgetTree.resizeInternal(panel.resizer(), false)
+                }
             }
         }
     }
