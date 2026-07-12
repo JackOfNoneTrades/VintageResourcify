@@ -18,9 +18,12 @@
 package dev.dediamondpro.resourcify.gui.browsepage
 
 import com.cleanroommc.modularui.api.drawable.IKey
+import com.cleanroommc.modularui.api.layout.IViewport
+import com.cleanroommc.modularui.api.layout.IViewportStack
 import com.cleanroommc.modularui.api.widget.IWidget
 import com.cleanroommc.modularui.factory.ClientGUI
 import com.cleanroommc.modularui.screen.ModularPanel
+import com.cleanroommc.modularui.utils.HoveredWidgetList
 import com.cleanroommc.modularui.widgets.ButtonWidget
 import com.cleanroommc.modularui.widgets.ListWidget
 import com.cleanroommc.modularui.widgets.TextWidget
@@ -67,7 +70,22 @@ private class SimpleList : ListWidget<IWidget, SimpleList>() {
         sodiumScrollbars()
     }
 }
+
+private class ChildPassthroughList : ListWidget<IWidget, ChildPassthroughList>() {
+    init {
+        sodiumScrollbars()
+    }
+
+    override fun getWidgetsAt(stack: IViewportStack, widgets: HoveredWidgetList, x: Int, y: Int) {
+        if (widgets.peek() === this && hasChildren()) {
+            IViewport.getChildrenAt(this, stack, widgets, x, y)
+        }
+    }
+}
 private class Container : ParentWidget<Container>()
+private class NonHoverableContainer : ParentWidget<NonHoverableContainer>() {
+    override fun canHover(): Boolean = false
+}
 
 // Card layout constants. Sized so a 1080p window shows 6-7 cards above the
 // fold and small windows still render readable text.
@@ -102,7 +120,7 @@ class BrowseScreen(
             return super.onKeyPressed(character, keyCode)
         }
     }.sodiumTextField(style).hintText(localize("resourcify.browse.search.placeholder"))
-    val resultsList = SimpleList()
+    val resultsList = ChildPassthroughList()
     val filtersList = SimpleList()
     // Holds the "Filters" + "Minecraft version" labels and the actual
     // DropDownMenu, OUTSIDE of filtersList so the dropdown's open menu
@@ -673,7 +691,7 @@ private fun buildCard(
     val iconTop = (CARD_HEIGHT - ICON_SIZE) / 2
     val textBlockH = 36
     val textTop = (CARD_HEIGHT - textBlockH) / 2
-    val content = Container()
+    val content = NonHoverableContainer()
         .widthRel(1f).heightRel(1f)
         .sodiumTransparent()
         .child(
