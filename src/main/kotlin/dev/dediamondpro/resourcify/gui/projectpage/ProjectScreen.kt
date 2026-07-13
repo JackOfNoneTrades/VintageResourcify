@@ -482,6 +482,14 @@ class ProjectScreen(
         downloadOverlay.setEnabled(false)
     }
 
+    fun inferUpdateTrack(selected: String?, version: IVersion): String? {
+        if (selected != null) return selected
+        val supported = version.getMinecraftVersions()
+        val running = Platform.getMcVersion()
+        if (running in supported) return running
+        return supported.sortedWith(Comparator(::compareVersionDesc)).firstOrNull()
+    }
+
     fun completeDownload(version: IVersion, target: File, result: DownloadResult?, error: Throwable?) {
         if (selectedDownloadVersion[0] !== version) return
         when {
@@ -493,9 +501,25 @@ class ProjectScreen(
                 setDownloadState(DownloadPanelState.CANCELLED, localize("resourcify.download.cancelled"))
             else -> {
                 try {
-                    LocalIndex.forFolder(packsFolder).record(target, platformId, project.getId())
+                    LocalIndex.forFolder(packsFolder).record(
+                        target,
+                        platformId,
+                        project.getId(),
+                        version,
+                        inferUpdateTrack(selectedMcVersion[0], version),
+                    )
                 } catch (e: Throwable) {
                     VintageResourcify.LOG.warn("Failed to record install index entry", e)
+                }
+                if (!isShader) {
+                    try {
+                        Platform.reloadResourcePack(target)
+                        if (Platform.isResourcePackEnabled(target)) {
+                            Platform.reloadResources()
+                        }
+                    } catch (e: Throwable) {
+                        VintageResourcify.LOG.warn("Failed to refresh downloaded pack metadata for {}", target.name, e)
+                    }
                 }
                 downloadedFile[0] = target
                 setDownloadState(DownloadPanelState.DONE, localize("resourcify.download.complete"))
@@ -961,7 +985,7 @@ class ProjectScreen(
     val downloadButtonTop = downloadPanelTop + downloadPanelH - 28
     val downloadProgressTop = downloadButtonTop - 16
     val downloadStatusTop = downloadProgressTop - 12
-    val downloadChangelogTop = downloadPanelTop + 86
+    val downloadChangelogTop = downloadPanelTop + 98
     val downloadChangelogH = (downloadStatusTop - downloadChangelogTop - 6).coerceAtLeast(24)
     val downloadInnerLeft = downloadPanelLeft + DOWNLOAD_PANEL_PAD
     val downloadBackdrop = SimpleButton()
@@ -1093,8 +1117,25 @@ class ProjectScreen(
                 .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
         )
         .child(
+            TextWidget(IKey.dynamic {
+                val version = selectedDownloadVersion[0]
+                val track = version?.let { inferUpdateTrack(selectedMcVersion[0], it) }
+                    ?: Platform.getMcVersion()
+                localize(
+                    if (version != null && Platform.getMcVersion() !in version.getMinecraftVersions()) {
+                        "resourcify.download.update_track_review"
+                    } else "resourcify.download.update_track",
+                    track,
+                )
+            })
+                .top(downloadPanelTop + 66).left(downloadInnerLeft)
+                .width(downloadTextW).height(10)
+                .color(accent)
+                .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)
+        )
+        .child(
             TextWidget(IKey.str(localize("resourcify.updates.changelog")).style(EnumChatFormatting.BOLD))
-                .top(downloadPanelTop + 70).left(downloadInnerLeft)
+                .top(downloadPanelTop + 82).left(downloadInnerLeft)
                 .width(downloadTextW).height(10)
                 .color(accent)
                 .alignment(com.cleanroommc.modularui.utils.Alignment.CenterLeft)

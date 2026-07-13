@@ -72,6 +72,11 @@ interface IService {
     /**
      * Returning null as the version means the service has the project, but it is already up to date.
      * If the service does not have the project, it should not be included in the response
+     * A null [minecraftVersion] requests the newest release without a Minecraft-version filter.
      */
-    fun getUpdates(files: List<File>, type: ProjectType): CompletableFuture<Map<File, IVersion?>>
+    fun getUpdates(
+        files: List<File>,
+        type: ProjectType,
+        minecraftVersion: String?,
+    ): CompletableFuture<Map<File, IVersion?>>
 }

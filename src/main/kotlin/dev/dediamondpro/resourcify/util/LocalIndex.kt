@@ -20,6 +20,7 @@ package dev.dediamondpro.resourcify.util
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import dev.dediamondpro.resourcify.VintageResourcify
+import dev.dediamondpro.resourcify.services.IVersion
 import java.io.File
 
 /**
@@ -35,11 +36,30 @@ import java.io.File
  */
 class LocalIndex private constructor(private val folder: File) {
 
+    data class IgnoredUpdate(
+        val signature: String,
+        val name: String,
+        val versionNumber: String?,
+        val fileName: String,
+        val minecraftVersions: List<String>,
+        val releaseDate: String,
+    )
+
     data class Entry(
         val fileName: String,
         val sha1: String?,
         val platform: String,
         val projectId: String,
+        /** Stable description of the installed remote file, when known. */
+        val installedVersion: String? = null,
+        /** Compatibility claimed by the installed file at download time. */
+        val minecraftVersions: List<String>? = null,
+        /** Minecraft branch to follow; null means the latest release on any branch. */
+        val updateTrack: String? = null,
+        val installedReleaseDate: String? = null,
+        /** Candidate-specific ignore token. A different future release is visible again. */
+        val ignoredVersion: String? = null,
+        val ignoredUpdates: List<IgnoredUpdate>? = null,
     )
 
     private data class IndexFile(val entries: MutableList<Entry> = mutableListOf())
@@ -70,14 +90,75 @@ class LocalIndex private constructor(private val folder: File) {
         return data.entries.firstOrNull { it.sha1 == sha }
     }
 
+    @Synchronized
     fun listEntries(): List<Entry> = data.entries.toList()
 
     /** Insert or replace the entry for [file]. Persists synchronously. */
     @Synchronized
-    fun record(file: File, platform: String, projectId: String) {
+    fun record(
+        file: File,
+        platform: String,
+        projectId: String,
+        version: IVersion? = null,
+        updateTrack: String? = null,
+        previous: Entry? = null,
+    ) {
         val sha = Utils.getSha1(file)
         data.entries.removeAll { it.fileName == file.name }
-        data.entries.add(Entry(file.name, sha, platform, projectId))
+        data.entries.add(
+            Entry(
+                fileName = file.name,
+                sha1 = sha,
+                platform = platform,
+                projectId = projectId,
+                installedVersion = version?.let { versionSignature(platform, it) } ?: previous?.installedVersion,
+                minecraftVersions = version?.getMinecraftVersions() ?: previous?.minecraftVersions,
+                updateTrack = updateTrack ?: previous?.updateTrack,
+                installedReleaseDate = version?.getReleaseDate() ?: previous?.installedReleaseDate,
+                ignoredVersion = null,
+                ignoredUpdates = previous?.ignoredUpdates,
+            )
+        )
+        save()
+    }
+
+    @Synchronized
+    fun ignoreVersion(fileName: String, platform: String, version: IVersion) {
+        val ignored = IgnoredUpdate(
+            signature = versionSignature(platform, version),
+            name = version.getName(),
+            versionNumber = version.getVersionNumber(),
+            fileName = version.getFileName(),
+            minecraftVersions = version.getMinecraftVersions(),
+            releaseDate = version.getReleaseDate(),
+        )
+        replace(fileName) { entry ->
+            entry.copy(
+                ignoredVersion = null,
+                ignoredUpdates = (entry.ignoredUpdates.orEmpty().filterNot { it.signature == ignored.signature } + ignored),
+            )
+        }
+    }
+
+    @Synchronized
+    fun restoreVersion(fileName: String, signature: String) {
+        replace(fileName) { entry ->
+            entry.copy(
+                ignoredVersion = entry.ignoredVersion.takeUnless { it == signature },
+                ignoredUpdates = entry.ignoredUpdates.orEmpty().filterNot { it.signature == signature },
+            )
+        }
+    }
+
+    @Synchronized
+    fun setUpdateTrack(fileName: String, track: String?) {
+        replace(fileName) { it.copy(updateTrack = track) }
+    }
+
+    private fun replace(fileName: String, transform: (Entry) -> Entry) {
+        val index = data.entries.indexOfFirst { it.fileName == fileName }
+        if (index < 0) return
+        data.entries[index] = transform(data.entries[index])
         save()
     }
 
@@ -127,5 +208,14 @@ class LocalIndex private constructor(private val folder: File) {
         @Synchronized
         fun forFolder(folder: File): LocalIndex =
             cache.getOrPut(folder.canonicalFile) { LocalIndex(folder.canonicalFile) }
+
+        fun versionSignature(platform: String, version: IVersion): String = listOf(
+            platform,
+            version.getProjectId(),
+            version.getFileName(),
+            version.getSha1(),
+            version.getVersionNumber().orEmpty(),
+            version.getName(),
+        ).joinToString("\u001F")
     }
 }

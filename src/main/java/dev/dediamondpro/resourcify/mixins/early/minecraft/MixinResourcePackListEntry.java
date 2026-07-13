@@ -51,12 +51,16 @@ public abstract class MixinResourcePackListEntry {
         if (file == null) return;
         java.io.File folder = PackOverlayRenderer.INSTANCE.resourcePacksFolder();
         String platform = PackOverlayRenderer.INSTANCE.lookupPlatform(folder, file);
+        boolean hasUpdate = PackOverlayRenderer.INSTANCE.hasAvailableUpdate(folder, file);
         // Badge: only shown for packs we installed (have a platform record).
         if (platform != null) {
             int badge = 10;
             // Vanilla draws the 32x32 pack icon at the row's top-left (x, y).
             // Anchor the badge to its bottom-right corner.
             PackOverlayRenderer.INSTANCE.drawBadge(platform, x + 32 - badge, y + 32 - badge, badge, mouseX, mouseY);
+        }
+        if (hasUpdate) {
+            PackOverlayRenderer.INSTANCE.drawUpdateDot(x, y, 32);
         }
         // Cross: shown for real files in the resource-pack folder while the
         // row is hovered. Virtual repository entries do not get a delete
@@ -69,6 +73,12 @@ public abstract class MixinResourcePackListEntry {
             // vanilla pads the bottom; nudge the cross up to compensate.
             int cx = x + listWidth - cross - 10;
             int cy = y + (slotHeight - cross) / 2 - 2;
+            int gearX = cx - cross - 4;
+            if (hasUpdate) {
+                PackOverlayRenderer.INSTANCE
+                    .drawUpdateButton(folder, file, gearX - cross - 4, cy, cross, mouseX, mouseY);
+            }
+            PackOverlayRenderer.INSTANCE.drawSettingsButton(folder, file, gearX, cy, cross, mouseX, mouseY);
             PackOverlayRenderer.INSTANCE.drawDeleteButton(folder, file, file.getName(), cx, cy, cross, mouseX, mouseY);
         }
     }

@@ -23,6 +23,7 @@ import org.apache.http.client.utils.URIBuilder
 import java.io.File
 import java.net.URI
 import java.net.URL
+import java.time.Instant
 import java.util.concurrent.CompletableFuture
 
 open class ModrinthApiService(
@@ -157,7 +158,11 @@ open class ModrinthApiService(
             .associateBy { project -> ids.first { project.getId() == it } }
     }
 
-    override fun getUpdates(files: List<File>, type: ProjectType): CompletableFuture<Map<File, IVersion?>> {
+    override fun getUpdates(
+        files: List<File>,
+        type: ProjectType,
+        minecraftVersion: String?,
+    ): CompletableFuture<Map<File, IVersion?>> {
         return supplyAsync {
             val hashes = files.mapNotNull {
                 val hash = Utils.getSha1(it)
@@ -169,12 +174,47 @@ open class ModrinthApiService(
                 ProjectType.OPTIFINE_SHADER -> "optifine"
                 else -> error("$type is not supported in updates")
             }
+            if (minecraftVersion == null) {
+                return@supplyAsync getLatestUnfilteredUpdates(hashes, loader)
+            }
             val data: Map<String, ModrinthVersion> = URL("${apiUrl}/version_files/update").postAndGetJson<Map<String, ModrinthVersion>, ModrinthUpdateFormat>(
-                ModrinthUpdateFormat(loaders = listOf(loader), hashes = hashes.keys.toList())
+                ModrinthUpdateFormat(
+                    loaders = listOf(loader),
+                    hashes = hashes.keys.toList(),
+                    gameVersions = listOf(minecraftVersion),
+                )
             ) ?: error("Failed to fetch updates")
             // Associate with file, and if we already have the latest version, set the result to null
             data.map { hashes[it.key]!! to if (it.key == it.value.getSha1()) null else it.value }.toMap()
         }
+    }
+
+    private fun getLatestUnfilteredUpdates(
+        hashes: Map<String, File>,
+        loader: String,
+    ): Map<File, IVersion?> {
+        val installed = URL("${apiUrl}/version_files")
+            .postAndGetJson<Map<String, ModrinthVersion>, ModrinthHashLookupFormat>(
+                ModrinthHashLookupFormat(hashes.keys.toList())
+            ) ?: error("Failed to resolve installed versions")
+        val projectVersions = mutableMapOf<String, List<ModrinthVersion>>()
+        return installed.mapNotNull { (hash, current) ->
+            val localFile = hashes[hash] ?: return@mapNotNull null
+            val versions = projectVersions.getOrPut(current.getProjectId()) {
+                URL("${apiUrl}/project/${current.getProjectId()}/version")
+                    .getJson<List<ModrinthVersion>>()
+                    ?.filter { it.hasFile() && loader in it.getLoaders() }
+                    ?: emptyList()
+            }
+            val currentDate = runCatching { Instant.parse(current.getReleaseDate()) }.getOrNull()
+            val candidate = versions.maxByOrNull {
+                runCatching { Instant.parse(it.getReleaseDate()) }.getOrDefault(Instant.EPOCH)
+            }?.takeIf {
+                it.getSha1() != hash && (currentDate == null ||
+                    runCatching { Instant.parse(it.getReleaseDate()).isAfter(currentDate) }.getOrDefault(true))
+            }
+            localFile to candidate
+        }.toMap()
     }
 
     private fun ProjectType.getProjectType(): String? = when (this) {

@@ -34,7 +34,10 @@ public class MixinIrisShaderPackEntry {
         // Always reserve cross-width on the right so badge position stays
         // stable whether or not the row is hovered.
         int xCross = x + listWidth - cross - 2;
-        int xBadge = xCross - badge - 4;
+        int xGear = xCross - cross - 4;
+        boolean hasUpdate = PackOverlayRenderer.INSTANCE.hasAvailableUpdate(folder, file);
+        int xUpdate = xGear - cross - 4;
+        int xBadge = (hasUpdate ? xUpdate : xGear) - badge - 4;
         int yMid = y - 1;
         String platform = PackOverlayRenderer.INSTANCE.lookupPlatform(folder, file);
         if (platform != null) {
@@ -45,6 +48,10 @@ public class MixinIrisShaderPackEntry {
             // centers on the ~9px text band when offset upward by half
             // the diff.
             int yCross = y - 4;
+            if (hasUpdate) {
+                PackOverlayRenderer.INSTANCE.drawUpdateButton(folder, file, xUpdate, yCross, cross, mouseX, mouseY);
+            }
+            PackOverlayRenderer.INSTANCE.drawSettingsButton(folder, file, xGear, yCross, cross, mouseX, mouseY);
             PackOverlayRenderer.INSTANCE
                 .drawDeleteButton(folder, file, packName, xCross, yCross, cross, mouseX, mouseY);
         }

@@ -31,7 +31,9 @@ import net.minecraft.client.renderer.Tessellator
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.util.ResourceLocation
 import org.lwjgl.opengl.GL11
+import java.awt.image.BufferedImage
 import java.io.File
+import java.util.zip.ZipFile
 import javax.imageio.ImageIO
 
 /**
@@ -47,6 +49,8 @@ object PackOverlayRenderer {
     private const val BADGE_BACKGROUND_ALPHA = 0.55f
     // cross.png is a 32x16 spritesheet; left 16x16 is unhovered, right is hovered.
     private val CROSS_TEXTURE = ResourceLocation(VintageResourcify.MODID, "cross.png")
+    private val GEAR_TEXTURE = ResourceLocation(VintageResourcify.MODID, "gears.png")
+    private val UPDATE_TEXTURE = ResourceLocation(VintageResourcify.MODID, "update.png")
     private val DELETE_SOUND = ResourceLocation(VintageResourcify.MODID, "delete")
     private val DELETE_WARNING_SOUND = ResourceLocation(VintageResourcify.MODID, "delete_warning")
     private val ENTRY_HOVER_SOUND = ResourceLocation(VintageResourcify.MODID, "tick")
@@ -54,14 +58,35 @@ object PackOverlayRenderer {
     private const val CROSS_TEX_WIDTH = 32
     private const val CROSS_TEX_HEIGHT = 16
     private const val CROSS_FRAME = 16
+    private const val GEAR_TEX_WIDTH = 40
+    private const val GEAR_TEX_HEIGHT = 20
+    private const val GEAR_FRAME = 20
 
     private data class PlatformTexture(val location: ResourceLocation, val width: Int, val height: Int)
+    private data class PackTexture(
+        val location: ResourceLocation,
+        val width: Int,
+        val height: Int,
+        val lastModified: Long,
+        val length: Long,
+    )
 
     private val textures = mutableMapOf<String, PlatformTexture>()
+    private val packTextures = mutableMapOf<String, PackTexture>()
 
     private data class DeleteRegion(
         val x1: Int, val y1: Int, val x2: Int, val y2: Int,
         val folder: File, val file: File, val displayName: String,
+    )
+
+    private data class SettingsRegion(
+        val x1: Int, val y1: Int, val x2: Int, val y2: Int,
+        val folder: File, val file: File,
+    )
+
+    private data class UpdateRegion(
+        val x1: Int, val y1: Int, val x2: Int, val y2: Int,
+        val folder: File, val file: File,
     )
 
     // Double-buffered to handle Iris's IrisGuiSlot.drawScreen, which pumps
@@ -73,6 +98,10 @@ object PackOverlayRenderer {
     // to hit-test against. We swap at end-of-frame.
     private val activeRegions = mutableListOf<DeleteRegion>()
     private val scratch = mutableListOf<DeleteRegion>()
+    private val activeSettingsRegions = mutableListOf<SettingsRegion>()
+    private val settingsScratch = mutableListOf<SettingsRegion>()
+    private val activeUpdateRegions = mutableListOf<UpdateRegion>()
+    private val updateScratch = mutableListOf<UpdateRegion>()
     private var entryHoverSeenThisFrame = false
     private var lastEntryHoverKey: String? = null
     @Volatile private var deleteReloadInProgress = false
@@ -80,6 +109,8 @@ object PackOverlayRenderer {
     /** Reset the scratch buffer at the start of a frame. [activeRegions] keeps last frame's data. */
     fun beginFrame() {
         scratch.clear()
+        settingsScratch.clear()
+        updateScratch.clear()
         entryHoverSeenThisFrame = false
     }
 
@@ -87,6 +118,10 @@ object PackOverlayRenderer {
     fun endFrame() {
         activeRegions.clear()
         activeRegions.addAll(scratch)
+        activeSettingsRegions.clear()
+        activeSettingsRegions.addAll(settingsScratch)
+        activeUpdateRegions.clear()
+        activeUpdateRegions.addAll(updateScratch)
         if (!entryHoverSeenThisFrame) {
             lastEntryHoverKey = null
         }
@@ -127,6 +162,69 @@ object PackOverlayRenderer {
 
     fun lookupPlatform(folder: File, file: File): String? =
         LocalIndex.forFolder(folder).lookupByFileName(file)?.platform
+
+    fun hasAvailableUpdate(folder: File, file: File): Boolean =
+        PackScreensAddition.hasAvailableUpdate(folder, file)
+
+    fun drawPackIcon(file: File, x: Int, y: Int, size: Int) {
+        val texture = packTextureFor(file) ?: return
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT or GL11.GL_COLOR_BUFFER_BIT or GL11.GL_CURRENT_BIT)
+        try {
+            GL11.glEnable(GL11.GL_TEXTURE_2D)
+            GL11.glEnable(GL11.GL_BLEND)
+            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO)
+            GL11.glColor4f(1f, 1f, 1f, 1f)
+            Minecraft.getMinecraft().textureManager.bindTexture(texture.location)
+            Gui.func_152125_a(
+                x, y, 0f, 0f, texture.width, texture.height,
+                size, size, texture.width.toFloat(), texture.height.toFloat(),
+            )
+        } finally {
+            GL11.glPopAttrib()
+        }
+    }
+
+    fun drawUpdateDot(iconX: Int, iconY: Int, iconSize: Int) {
+        val x = iconX + iconSize - 7
+        val y = iconY - 1
+        Gui.drawRect(x, y + 1, x + 7, y + 6, 0xCC000000.toInt())
+        Gui.drawRect(x + 1, y, x + 6, y + 7, 0xCC000000.toInt())
+        Gui.drawRect(x + 1, y + 2, x + 6, y + 5, 0xFFFFC928.toInt())
+        Gui.drawRect(x + 2, y + 1, x + 5, y + 6, 0xFFFFC928.toInt())
+    }
+
+    private fun packTextureFor(file: File): PackTexture? {
+        val canonical = safeCanonical(file)
+        val key = canonical.path
+        val modified = canonical.lastModified()
+        val length = canonical.length()
+        packTextures[key]?.let { cached ->
+            if (!canonical.exists() || (cached.lastModified == modified && cached.length == length)) return cached
+        }
+        val image = loadPackImage(canonical) ?: try {
+            Minecraft.getMinecraft().mcDefaultResourcePack.packImage
+        } catch (_: Throwable) {
+            null
+        } ?: return null
+        val location = Minecraft.getMinecraft().textureManager.getDynamicTextureLocation(
+            "vresourcify_pack_${Integer.toHexString(key.hashCode())}",
+            DynamicTexture(image),
+        )
+        return PackTexture(location, image.width, image.height, modified, length).also { packTextures[key] = it }
+    }
+
+    private fun loadPackImage(file: File): BufferedImage? = try {
+        when {
+            file.isDirectory -> File(file, "pack.png").takeIf { it.isFile }?.let(ImageIO::read)
+            file.isFile -> ZipFile(file).use { zip ->
+                val entry = zip.getEntry("pack.png") ?: return@use null
+                zip.getInputStream(entry).use(ImageIO::read)
+            }
+            else -> null
+        }
+    } catch (_: Throwable) {
+        null
+    }
 
     /**
      * Draw the platform icon at [x],[y] sized [size]x[size]. Caller picks the
@@ -291,6 +389,69 @@ object PackOverlayRenderer {
         }
     }
 
+    fun drawSettingsButton(
+        folder: File, file: File,
+        x: Int, y: Int, size: Int,
+        mouseX: Int, mouseY: Int,
+    ) {
+        if (LocalIndex.forFolder(folder).lookupByFileName(file) == null) return
+        val hovered = mouseX in x..(x + size) && mouseY in y..(y + size)
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT or GL11.GL_COLOR_BUFFER_BIT or GL11.GL_CURRENT_BIT)
+        try {
+            GL11.glEnable(GL11.GL_TEXTURE_2D)
+            GL11.glEnable(GL11.GL_BLEND)
+            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO)
+            GL11.glColor4f(1f, 1f, 1f, 1f)
+            Minecraft.getMinecraft().textureManager.bindTexture(GEAR_TEXTURE)
+            Gui.func_152125_a(
+                x, y,
+                if (hovered) GEAR_FRAME.toFloat() else 0f, 0f,
+                GEAR_FRAME, GEAR_TEX_HEIGHT,
+                size, size,
+                GEAR_TEX_WIDTH.toFloat(), GEAR_TEX_HEIGHT.toFloat(),
+            )
+        } finally {
+            GL11.glPopAttrib()
+        }
+        settingsScratch.add(SettingsRegion(x, y, x + size, y + size, folder, file))
+        if (hovered) {
+            pendingTooltipText = localize("resourcify.pack.update_settings")
+            pendingTooltipX = mouseX
+            pendingTooltipY = mouseY
+        }
+    }
+
+    fun drawUpdateButton(
+        folder: File, file: File,
+        x: Int, y: Int, size: Int,
+        mouseX: Int, mouseY: Int,
+    ) {
+        if (!PackScreensAddition.hasAvailableUpdate(folder, file)) return
+        val hovered = mouseX in x..(x + size) && mouseY in y..(y + size)
+        Gui.drawRect(x, y, x + size, y + size, if (hovered) 0xAA000000.toInt() else 0x66000000)
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT or GL11.GL_COLOR_BUFFER_BIT or GL11.GL_CURRENT_BIT)
+        try {
+            GL11.glEnable(GL11.GL_TEXTURE_2D)
+            GL11.glEnable(GL11.GL_BLEND)
+            OpenGlHelper.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ZERO)
+            GL11.glColor4f(1f, 1f, 1f, 1f)
+            Minecraft.getMinecraft().textureManager.bindTexture(UPDATE_TEXTURE)
+            val iconSize = size.coerceAtMost(16)
+            Gui.func_152125_a(
+                x + (size - iconSize) / 2, y + (size - iconSize) / 2,
+                0f, 0f, 16, 16, iconSize, iconSize, 16f, 16f,
+            )
+        } finally {
+            GL11.glPopAttrib()
+        }
+        updateScratch.add(UpdateRegion(x, y, x + size, y + size, folder, file))
+        if (hovered) {
+            pendingTooltipText = localize("resourcify.pack.update_now")
+            pendingTooltipX = mouseX
+            pendingTooltipY = mouseY
+        }
+    }
+
     /**
      * Returns true if the click at [mouseX]/[mouseY] hit one of the rects
      * recorded by [drawDeleteButton] this frame. Caller cancels the host
@@ -301,7 +462,20 @@ object PackOverlayRenderer {
      */
     fun handleDeleteClick(mouseX: Int, mouseY: Int, button: Int, refresh: () -> Unit): Boolean {
         if (deleteReloadInProgress) return true
+        if (PackScreensAddition.hasOpenPopup()) {
+            return PackScreensAddition.onOpenPopupClick(mouseX, mouseY, button)
+        }
         if (button != 0) return false
+        val updateHit = updateRegionAt(mouseX, mouseY)
+        if (updateHit != null) {
+            PackScreensAddition.openDirectUpdate(updateHit.folder, updateHit.file)
+            return true
+        }
+        val settingsHit = settingsRegionAt(mouseX, mouseY)
+        if (settingsHit != null) {
+            PackScreensAddition.openPackSettings(settingsHit.folder, settingsHit.file)
+            return true
+        }
         val hit = deleteRegionAt(mouseX, mouseY) ?: return false
         val mc = Minecraft.getMinecraft()
         playDeleteWarningSound()
@@ -339,7 +513,16 @@ object PackOverlayRenderer {
     }
 
     fun isDeleteButtonAt(mouseX: Int, mouseY: Int): Boolean =
-        deleteRegionAt(mouseX, mouseY) != null
+        deleteRegionAt(mouseX, mouseY) != null || settingsRegionAt(mouseX, mouseY) != null ||
+            updateRegionAt(mouseX, mouseY) != null
+
+    private fun updateRegionAt(mouseX: Int, mouseY: Int): UpdateRegion? =
+        activeUpdateRegions.firstOrNull { mouseX in it.x1..it.x2 && mouseY in it.y1..it.y2 }
+            ?: updateScratch.firstOrNull { mouseX in it.x1..it.x2 && mouseY in it.y1..it.y2 }
+
+    private fun settingsRegionAt(mouseX: Int, mouseY: Int): SettingsRegion? =
+        activeSettingsRegions.firstOrNull { mouseX in it.x1..it.x2 && mouseY in it.y1..it.y2 }
+            ?: settingsScratch.firstOrNull { mouseX in it.x1..it.x2 && mouseY in it.y1..it.y2 }
 
     private fun deleteRegionAt(mouseX: Int, mouseY: Int): DeleteRegion? {
         val hit = activeRegions.firstOrNull { mouseX in it.x1..it.x2 && mouseY in it.y1..it.y2 }

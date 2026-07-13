@@ -18,7 +18,6 @@
 package dev.dediamondpro.resourcify.services.curseforge
 
 import dev.dediamondpro.resourcify.config.Config
-import dev.dediamondpro.resourcify.platform.Platform
 import dev.dediamondpro.resourcify.services.*
 import dev.dediamondpro.resourcify.util.*
 import org.apache.http.client.utils.URIBuilder
@@ -163,7 +162,11 @@ object CurseForgeService : IService {
 
     }
 
-    override fun getUpdates(files: List<File>, type: ProjectType): CompletableFuture<Map<File, IVersion?>> {
+    override fun getUpdates(
+        files: List<File>,
+        type: ProjectType,
+        minecraftVersion: String?,
+    ): CompletableFuture<Map<File, IVersion?>> {
         return supplyAsync {
             val hashes = files.associateBy {
                 if (it.length() >= 1024 * 1024 * 512) {
@@ -174,7 +177,7 @@ object CurseForgeService : IService {
                 val bytes = it.readBytes()
                 MurmurHash2.cfHash(bytes, bytes.size)
             }.filterKeys { it != null }
-            val mcVersion = Platform.getMcVersion()
+            val mcVersion = minecraftVersion
             val result = URL("$API/fingerprints/432")
                 .postAndGetJson<CurseForgeFingerprintResponse, CurseForgeFingerprint>(
                     CurseForgeFingerprint(hashes.keys.map { it!! }.toList()),
@@ -188,22 +191,26 @@ object CurseForgeService : IService {
             val fileFutures: MutableMap<CurseForgeFingerprintMatch, CompletableFuture<CurseForgeVersion?>> =
                 mutableMapOf()
             for (match in result) {
+                val installedDate = Instant.from(DateTimeFormatter.ISO_INSTANT.parse(match.file.getReleaseDate()))
                 val fileCandidate = match.latestFiles.sortedByDescending {
                     Instant.from(DateTimeFormatter.ISO_INSTANT.parse(it.getReleaseDate()))
                 }.firstOrNull { file ->
-                    file.getMinecraftVersions().contains(mcVersion)
+                    (mcVersion == null || file.getMinecraftVersions().contains(mcVersion)) &&
+                        Instant.from(DateTimeFormatter.ISO_INSTANT.parse(file.getReleaseDate())).isAfter(installedDate)
                 }
                 if (fileCandidate == null && !match.latestFiles.any { it.fileFingerprint == match.file.fileFingerprint }) {
                     fileFutures[match] = supplyAsync {
-                        URIBuilder("$API/mods/${match.id}/files")
-                            .addParameter("gameVersion", mcVersion)
+                        val builder = URIBuilder("$API/mods/${match.id}/files")
                             // We only care about the most recent match
                             .addParameter("pageSize", "1")
-                            .build().toURL()
+                        if (mcVersion != null) builder.addParameter("gameVersion", mcVersion)
+                        builder.build().toURL()
                             .getJson<CurseForgeProject.Versions>(headers = requestHeaders())
                             ?.data?.sortedByDescending {
                                 Instant.from(DateTimeFormatter.ISO_INSTANT.parse(it.getReleaseDate()))
-                            }?.firstOrNull() ?: error("Failed to find matching version")
+                            }?.firstOrNull {
+                                Instant.from(DateTimeFormatter.ISO_INSTANT.parse(it.getReleaseDate())).isAfter(installedDate)
+                            }
                     }
                 } else {
                     // Latest files contains update or file is up to date

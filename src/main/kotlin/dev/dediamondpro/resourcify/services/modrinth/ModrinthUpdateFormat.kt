@@ -18,11 +18,14 @@
 package dev.dediamondpro.resourcify.services.modrinth
 
 import com.google.gson.annotations.SerializedName
-import dev.dediamondpro.resourcify.platform.Platform
-
 data class ModrinthUpdateFormat(
     val hashes: List<String>,
     val loaders: List<String>,
     val algorithm: String = "sha1",
-    @SerializedName("game_versions") val gameVersions: List<String> = listOf(Platform.getMcVersion())
+    @SerializedName("game_versions") val gameVersions: List<String>,
+)
+
+data class ModrinthHashLookupFormat(
+    val hashes: List<String>,
+    val algorithm: String = "sha1",
 )
