@@ -8,6 +8,7 @@ import net.minecraft.client.gui.GuiMainMenu
 import net.minecraft.client.gui.ScaledResolution
 import net.minecraft.client.renderer.OpenGlHelper
 import net.minecraft.util.ResourceLocation
+import org.fentanylsolutions.fentlib.gui.PanoramaOverlayRenderer
 import org.lwjgl.opengl.GL11
 
 /** Animated title panorama shared by all Resourcify screens. */
@@ -58,8 +59,11 @@ object VanillaPanoramaBackdrop {
     }
 
     private fun drawOverlay(mc: Minecraft) {
+        val milkyPanorama = PanoramaOverlayRenderer.drawMilkyPanorama(scaledWidth, scaledHeight)
         if (!clearMyBackgroundLoaded) {
-            Gui.drawRect(0, 0, scaledWidth, scaledHeight, FALLBACK_DIM_COLOR)
+            if (!milkyPanorama) {
+                Gui.drawRect(0, 0, scaledWidth, scaledHeight, FALLBACK_DIM_COLOR)
+            }
             return
         }
 
