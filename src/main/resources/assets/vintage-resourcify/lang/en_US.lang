@@ -298,3 +298,8 @@ resourcify.categories.parkour=Parkour
 resourcify.categories.creation=Creation
 resourcify.categories.puzzle=Puzzle
 resourcify.categories.modded_world=Modded World
+
+resourcify.download.resolving=Preparing download...
+resourcify.download.browser_required=Complete this download in your browser.
+resourcify.download.open_browser=Open website
+resourcify.pack_updates.browser_required=Some updates require a browser. Open them individually.

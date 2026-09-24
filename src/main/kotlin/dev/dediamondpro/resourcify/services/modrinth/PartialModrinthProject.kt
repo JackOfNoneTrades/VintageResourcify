@@ -91,7 +91,7 @@ data class PartialModrinthProject(
     }
 
     override fun getMembers(): CompletableFuture<List<IMember>> = fetchMembers().thenApply { members ->
-        members?.map { it.user.apply { member = it } } ?: error("Failed to fetch members.")
+        members?.map { it.user.bindService(service()).apply { member = it } } ?: error("Failed to fetch members.")
     }
 
     override fun hasGallery(): Boolean = gallery.isNotEmpty()
@@ -103,6 +103,7 @@ data class PartialModrinthProject(
     override fun getVersions(): CompletableFuture<List<IVersion>> {
         return (versionsRequest ?: supplyAsync {
             URL("${service().apiUrl}/project/$slug/version").getJson<List<ModrinthVersion>>()
+                ?.onEach { it.bindService(service()) }
                 ?.filter { it.hasFile() }
                 // Filter mods (jar files) out of datapack versions
                 ?.filter { projectType != "mod" || it.getLoaders().contains("datapack") }
@@ -124,10 +125,18 @@ data class PartialModrinthProject(
     ) : IMember {
         var member: Member? = null
 
+        @Transient
+        private var browserBaseUrl: String? = null
+
+        internal fun bindService(service: ModrinthApiService): User {
+            browserBaseUrl = service.browserBaseUrl
+            return this
+        }
+
         override val role: String
             get() = member?.role ?: "Owner"
 
         override val url: String
-            get() = "https://modrinth.com/user/$name"
+            get() = "${browserBaseUrl ?: ModrinthService.browserBaseUrl}/user/$name"
     }
 }

@@ -140,7 +140,7 @@ open class ModrinthApiService(
         val type = when (path[0]) {
             "resourcepack" -> ProjectType.RESOURCE_PACK
             "datapack" -> ProjectType.DATA_PACK
-            "shaders" -> ProjectType.IRIS_SHADER // Whether its iris or optifine doesn't matter here
+            "shader", "shaders" -> ProjectType.IRIS_SHADER // Whether its iris or optifine doesn't matter here
             "mod", "modpack", "plugin" -> ProjectType.UNKNOWN
             else -> return null // Probably not a project url
         }
@@ -185,7 +185,7 @@ open class ModrinthApiService(
                 )
             ) ?: error("Failed to fetch updates")
             // Associate with file, and if we already have the latest version, set the result to null
-            data.map { hashes[it.key]!! to if (it.key == it.value.getSha1()) null else it.value }.toMap()
+            data.map { hashes[it.key]!! to if (it.key == it.value.getSha1()) null else it.value.bindService(this) }.toMap()
         }
     }
 
@@ -203,6 +203,7 @@ open class ModrinthApiService(
             val versions = projectVersions.getOrPut(current.getProjectId()) {
                 URL("${apiUrl}/project/${current.getProjectId()}/version")
                     .getJson<List<ModrinthVersion>>()
+                    ?.onEach { it.bindService(this) }
                     ?.filter { it.hasFile() && loader in it.getLoaders() }
                     ?: emptyList()
             }

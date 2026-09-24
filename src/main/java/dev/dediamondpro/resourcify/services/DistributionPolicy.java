@@ -4,9 +4,13 @@ import java.util.Locale;
 
 public final class DistributionPolicy {
 
-    public static final String CURSEFORGE_LIMITED_MESSAGE = "This CurseForge build only supports downloads from Modrinth and CurseForge.";
+    public static final String CURSEFORGE_LIMITED_MESSAGE = "This CurseForge build disables user-configured platforms. Additional providers require an addon mod.";
 
     private DistributionPolicy() {}
+
+    public static boolean allowAddonProviders() {
+        return true;
+    }
 
     public static boolean allowConfiguredPlatforms() {
         return true;

@@ -57,6 +57,7 @@ import dev.dediamondpro.resourcify.services.ProjectType
 import dev.dediamondpro.resourcify.util.AsyncIcon
 import dev.dediamondpro.resourcify.util.formatCompact
 import dev.dediamondpro.resourcify.util.DownloadManager
+import dev.dediamondpro.resourcify.util.DownloadResolver
 import dev.dediamondpro.resourcify.util.DownloadResult
 import dev.dediamondpro.resourcify.util.LocalIndex
 import dev.dediamondpro.resourcify.util.MarkdownRenderer
@@ -80,6 +81,7 @@ import java.awt.image.BufferedImage
 import java.io.File
 import java.net.URL
 import java.util.Locale
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicInteger
 
 private fun compareVersionDesc(a: String, b: String): Int {
@@ -330,6 +332,7 @@ private class DownloadProgressBar(
 }
 
 private enum class DownloadPanelState {
+    BROWSER,
     READY,
     DOWNLOADING,
     CANCELLED,
@@ -438,6 +441,9 @@ class ProjectScreen(
     val downloadStatus = arrayOf(localize("resourcify.download.ready"))
     val downloadUrl = arrayOf<URL?>(null)
     val downloadedFile = arrayOf<File?>(null)
+    val browserDownloadUrl = arrayOf<URL?>(null)
+    var downloadRequestToken = 0
+    var resolutionFuture: CompletableFuture<*>? = null
     val downloadButtonHolder = arrayOf<SimpleButton?>(null)
     val cancelButtonHolder = arrayOf<SimpleButton?>(null)
     val enableButtonHolder = arrayOf<SimpleButton?>(null)
@@ -450,7 +456,7 @@ class ProjectScreen(
         downloadButtonHolder[0]?.setEnabled(
             state == DownloadPanelState.READY ||
                 state == DownloadPanelState.CANCELLED ||
-                state == DownloadPanelState.FAILED
+                state == DownloadPanelState.FAILED || state == DownloadPanelState.BROWSER
         )
         cancelButtonHolder[0]?.setEnabled(state == DownloadPanelState.DOWNLOADING)
         enableButtonHolder[0]?.setEnabled(state == DownloadPanelState.DONE)
@@ -543,26 +549,52 @@ class ProjectScreen(
             return
         }
         val version = selectedDownloadVersion[0] ?: return
-        val url = version.getDownloadUrl() ?: run {
-            setDownloadState(DownloadPanelState.FAILED, localize("resourcify.download.no_url"))
+        if (downloadState[0] == DownloadPanelState.BROWSER) {
+            browserDownloadUrl[0]?.let {
+                UrlOpener.openLinkPrompted(it.toString(), Minecraft.getMinecraft().currentScreen)
+            }
             return
         }
-        if (!packsFolder.exists()) packsFolder.mkdirs()
-        val target = File(packsFolder, version.getFileName())
-        if (!isShader && target.exists()) Platform.closeResourcePack(target)
-        downloadUrl[0] = url
+        val target = try {
+            DownloadResolver.targetFile(packsFolder, version)
+        } catch (e: Exception) {
+            VintageResourcify.LOG.warn("Invalid provider download filename", e)
+            setDownloadState(DownloadPanelState.FAILED, localize("resourcify.download.failed"))
+            return
+        }
+        val token = ++downloadRequestToken
+        downloadUrl[0] = null
         downloadedFile[0] = target
-        setDownloadState(DownloadPanelState.DOWNLOADING, localize("resourcify.download.starting"))
-        DownloadManager.download(target, version.getSha1(), url, false)
-            .whenComplete { result, error ->
-                Minecraft.getMinecraft().func_152344_a {
-                    completeDownload(version, target, result, error)
+        setDownloadState(DownloadPanelState.DOWNLOADING, localize("resourcify.download.resolving"))
+        resolutionFuture = DownloadResolver.resolve(platformId, version).whenComplete { resolved, error ->
+            Minecraft.getMinecraft().func_152344_a {
+                if (token != downloadRequestToken) return@func_152344_a
+                resolutionFuture = null
+                if (error != null || resolved == null) {
+                    completeDownload(version, target, DownloadResult.FAILED, error)
+                } else if (resolved.isBrowser) {
+                    browserDownloadUrl[0] = resolved.url
+                    setDownloadState(DownloadPanelState.BROWSER, localize("resourcify.download.browser_required"))
+                } else {
+                    if (!packsFolder.exists()) packsFolder.mkdirs()
+                    if (!isShader && target.exists()) Platform.closeResourcePack(target)
+                    downloadUrl[0] = resolved.url
+                    setDownloadState(DownloadPanelState.DOWNLOADING, localize("resourcify.download.starting"))
+                    DownloadManager.downloadResolved(platformId, target, resolved).whenComplete { result, failure ->
+                        Minecraft.getMinecraft().func_152344_a {
+                            if (token == downloadRequestToken) completeDownload(version, target, result, failure)
+                        }
+                    }
                 }
             }
+        }
     }
 
     fun cancelDownload() {
         if (downloadState[0] != DownloadPanelState.DOWNLOADING) return
+        downloadRequestToken++
+        resolutionFuture?.cancel(false)
+        resolutionFuture = null
         downloadUrl[0]?.let { DownloadManager.cancelDownload(it) }
         setDownloadState(DownloadPanelState.CANCELLED, localize("resourcify.download.cancelled"))
     }
@@ -610,6 +642,8 @@ class ProjectScreen(
     }
 
     fun openDownloadPanel(version: IVersion) {
+        if (downloadState[0] == DownloadPanelState.DOWNLOADING) return
+        browserDownloadUrl[0] = null
         selectedDownloadVersion[0] = version
         downloadUrl[0] = null
         downloadedFile[0] = null
@@ -1039,9 +1073,11 @@ class ProjectScreen(
         .size(80, 16)
         .sodiumButton(style)
         .overlay(IKey.dynamic {
-            if (downloadState[0] == DownloadPanelState.FAILED ||
-                downloadState[0] == DownloadPanelState.CANCELLED
-            ) localize("resourcify.download.retry") else localize("resourcify.download.download")
+            when (downloadState[0]) {
+                DownloadPanelState.BROWSER -> localize("resourcify.download.open_browser")
+                DownloadPanelState.FAILED, DownloadPanelState.CANCELLED -> localize("resourcify.download.retry")
+                else -> localize("resourcify.download.download")
+            }
         })
         .onMousePressed { btn ->
             if (btn == 0) {

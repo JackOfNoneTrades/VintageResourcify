@@ -15,7 +15,7 @@
 
 ### ⚠️ This project's CurseForge API token has not be approved yet. Please set your own in the config.
 
-### ⚠️ The CurseForge version of this mod does not support downloading from third party Modrinth-compatible platforms.
+### ⚠️ The CurseForge version disables user-configured Modrinth-compatible platforms. Provider addon mods are supported.
 
 ## Features
 
@@ -27,6 +27,10 @@
 Vintage Resourcify supports Angelica [![curse](images/icons/curse.png)](https://www.curseforge.com/minecraft/mc-mods/angelica)  [![modrinth](images/icons/modrinth.png)](https://modrinth.com/mod/angelica/versions) [![git](images/icons/git.png)](https://github.com/GTNewHorizons/Angelica) and Swansong [![curse](images/icons/curse.png)](https://www.curseforge.com/minecraft/mc-mods/swansong)  [![modrinth](images/icons/modrinth.png)](https://modrinth.com/mod/swansong) [![git](images/icons/git.png)](https://github.com/vfx-dev/SwanSong). 
 
 ![search](images/screenshots/search.png)
+
+## Platform addons
+
+Separate Forge mods can register providers through the public API. See [Platform addons](https://github.com/JackOfNoneTrades/VintageResourcify/wiki/Platform-Addons) for the contract and examples. Addon providers are supported in both regular and CurseForge builds.
 
 ## Dependencies
 * [UniMixins](https://modrinth.com/mod/unimixins) [![curse](images/icons/curse.png)](https://www.curseforge.com/minecraft/mc-mods/unimixins)  [![modrinth](images/icons/modrinth.png)](https://modrinth.com/mod/unimixins/versions) [![git](images/icons/git.png)](https://github.com/LegacyModdingMC/UniMixins/releases)

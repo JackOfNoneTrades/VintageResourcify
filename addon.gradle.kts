@@ -104,7 +104,7 @@ dependencies.add("compileOnly", "org.commonmark:commonmark:0.29.0")
 dependencies.add("shadowImplementation", files(downgradedCommonmark))
 
 val curseForgeLimitedMessage =
-    "This CurseForge build only supports downloads from Modrinth and CurseForge."
+    "This CurseForge build disables user-configured platforms. Additional providers require an addon mod."
 val configuredCurseForgeProjectId = providers.gradleProperty("curseForgeProjectId")
     .orNull
     ?.trim()
@@ -155,7 +155,7 @@ val generateCurseForgeMcmodInfo = tasks.register<GenerateCurseForgeMcmodInfoTask
 
 val curseForgeJar = tasks.register<Jar>("curseForgeJar") {
     group = "build"
-    description = "Assembles a CurseForge-specific dev jar that only enables Modrinth and CurseForge downloads."
+    description = "Assembles a CurseForge-specific dev jar with configured platforms disabled and addon providers enabled."
 
     val normalJar = tasks.named<AbstractArchiveTask>("shadowJar")
 
@@ -267,5 +267,29 @@ tasks.withType<JavaExec>().configureEach {
                     !n.contains("angelica", ignoreCase = true)
             }
         }
+    }
+}
+
+// Exercise the public API against the same replacement classes packaged for CurseForge.
+tasks.register<Test>("testCurseForgeApi") {
+    group = "verification"
+    description = "Tests addon registration and download policy in the CurseForge distribution."
+    dependsOn(tasks.named(curseForgeReplacementSourceSet.classesTaskName), tasks.named("testClasses"))
+    testClassesDirs = sourceSets.named("test").get().output.classesDirs
+    classpath = curseForgeReplacementSourceSet.output + sourceSets.named("test").get().runtimeClasspath
+    systemProperty("resourcify.test.curseforge", "true")
+    include("**/ProviderApiTest.class", "**/DownloadManagerTest.class", "**/ModrinthProviderTest.class")
+}
+
+tasks.named("check").configure {
+    dependsOn("testCurseForgeApi")
+}
+
+tasks.withType<Test>().configureEach {
+    // Configuration and install-index tests must not read or create the developer's config.
+    val testWorkDir = layout.buildDirectory.dir("test-work/$name")
+    doFirst {
+        testWorkDir.get().asFile.mkdirs()
+        workingDir(testWorkDir.get().asFile)
     }
 }

@@ -30,6 +30,8 @@ import dev.dediamondpro.resourcify.services.IVersion
 import dev.dediamondpro.resourcify.services.ProjectType
 import dev.dediamondpro.resourcify.services.ServiceRegistry
 import dev.dediamondpro.resourcify.util.DownloadManager
+import dev.dediamondpro.resourcify.util.DownloadResolver
+import dev.dediamondpro.resourcify.util.UrlOpener
 import dev.dediamondpro.resourcify.util.DownloadResult
 import dev.dediamondpro.resourcify.util.LocalIndex
 import dev.dediamondpro.resourcify.util.ResourcifySounds
@@ -119,6 +121,7 @@ object PackScreensAddition {
     @Volatile private var directUpdateFile: File? = null
     @Volatile private var directUpdateStatus = ""
     @Volatile private var currentDownloadUrl: URL? = null
+    @Volatile private var activeResolution: CompletableFuture<*>? = null
     @Volatile private var activeDownload: CompletableFuture<DownloadResult>? = null
 
     private val prunedScreens = Collections.newSetFromMap(WeakHashMap<Any, Boolean>())
@@ -1045,6 +1048,7 @@ object PackScreensAddition {
         val file = settingsFile ?: return
         val localEntry = settingsEntry ?: return
         settingsUpdating = true
+        updateCancelRequested = false
         settingsStatus = localize("resourcify.pack_updates.status.updating")
         val wasEnabled = when (type) {
             ProjectType.RESOURCE_PACK, ProjectType.AYCY_RESOURCE_PACK -> Platform.isResourcePackEnabled(file)
@@ -1062,6 +1066,7 @@ object PackScreensAddition {
                 UpdateStatus.UPDATED -> localize("resourcify.pack_updates.status.updated")
                 UpdateStatus.FAILED -> localize("resourcify.pack_updates.status.failed")
                 UpdateStatus.CANCELLED -> localize("resourcify.pack_updates.status.cancelled")
+                UpdateStatus.BROWSER -> localize("resourcify.download.browser_required")
                 else -> settingsStatus
             }
             if (result == UpdateStatus.UPDATED) {
@@ -1324,7 +1329,8 @@ object PackScreensAddition {
             mouseY,
             enabled = buttonEnabled,
             tooltip = localize(
-                if (entry.disposition == UpdateDisposition.REVIEW) "resourcify.pack_updates.update_anyway"
+                if (entry.status == UpdateStatus.BROWSER) "resourcify.download.open_browser"
+                else if (entry.disposition == UpdateDisposition.REVIEW) "resourcify.pack_updates.update_anyway"
                 else "resourcify.updates.update"
             ).takeIf { buttonEnabled },
             accent = style.accent,
@@ -1351,6 +1357,7 @@ object PackScreensAddition {
                 updateCancelRequested = true
                 updateStatusText = localize("resourcify.pack_updates.cancelling")
                 currentDownloadUrl?.let { DownloadManager.cancelDownload(it) }
+                activeResolution?.cancel(false)
                 activeDownload?.cancel(false)
             }
             return true
@@ -1438,6 +1445,7 @@ object PackScreensAddition {
             var updated = 0
             var failed = 0
             var cancelled = 0
+            var browserRequired = 0
             for (item in prepared) {
                 if (updateCancelRequested) break
                 item.entry.status = UpdateStatus.UPDATING
@@ -1447,12 +1455,13 @@ object PackScreensAddition {
                     updateTotal,
                     item.entry.oldFile.name,
                 )
-                val result = performUpdate(item, type, folder)
+                val result = performUpdate(item, type, folder, allowBrowser = prepared.size == 1)
                 item.entry.status = result
                 when (result) {
                     UpdateStatus.UPDATED -> updated++
                     UpdateStatus.CANCELLED -> cancelled++
                     UpdateStatus.FAILED -> failed++
+                    UpdateStatus.BROWSER -> browserRequired++
                     else -> {}
                 }
                 updateCompleted++
@@ -1464,6 +1473,7 @@ object PackScreensAddition {
             updateStatusText = when {
                 cancelled > 0 -> localize("resourcify.pack_updates.cancelled_after", updateCompleted, updateTotal)
                 failed > 0 -> localize("resourcify.pack_updates.result_failed", updated, failed)
+                browserRequired > 0 -> localize("resourcify.pack_updates.browser_required")
                 updated == 1 -> localize("resourcify.pack_updates.result.one", updated)
                 else -> localize("resourcify.pack_updates.result.many", updated)
             }
@@ -1473,11 +1483,38 @@ object PackScreensAddition {
         }, "Resourcify-PackUpdate").apply { isDaemon = true }.start()
     }
 
-    private fun performUpdate(item: PreparedUpdate, type: ProjectType, folder: File): UpdateStatus {
+    private fun performUpdate(
+        item: PreparedUpdate, type: ProjectType, folder: File, allowBrowser: Boolean = true,
+    ): UpdateStatus {
         val entry = item.entry
         val version = entry.version ?: return UpdateStatus.FAILED
-        val url = version.getDownloadUrl() ?: return UpdateStatus.FAILED
-        val newFile = File(folder, version.getFileName())
+        val platformId = entry.localEntry.platform
+        if (!DistributionPolicy.canDownloadFrom(platformId)) return UpdateStatus.FAILED
+        if (updateCancelRequested) return UpdateStatus.CANCELLED
+        val newFile: File
+        val resolved = try {
+            newFile = DownloadResolver.targetFile(folder, version)
+            val resolution = DownloadResolver.resolve(platformId, version)
+            activeResolution = resolution
+            if (updateCancelRequested) resolution.cancel(false)
+            resolution.get()
+        } catch (e: Exception) {
+            if (updateCancelRequested) return UpdateStatus.CANCELLED
+            VintageResourcify.LOG.warn("Could not resolve provider download", e)
+            return UpdateStatus.FAILED
+        } finally {
+            activeResolution = null
+        }
+        if (updateCancelRequested) return UpdateStatus.CANCELLED
+        if (resolved.isBrowser) {
+            if (allowBrowser) runClientSync {
+                if (!updateCancelRequested) {
+                    UrlOpener.openLinkPrompted(resolved.url.toString(), Minecraft.getMinecraft().currentScreen)
+                }
+            }
+            return UpdateStatus.BROWSER
+        }
+        val url = resolved.url
         val index = LocalIndex.forFolder(folder)
         val oldEntry = index.lookupByFile(entry.oldFile)
 
@@ -1493,7 +1530,8 @@ object PackScreensAddition {
         }
 
         currentDownloadUrl = url
-        val future = DownloadManager.download(newFile, version.getSha1(), url, false)
+        val future = DownloadManager.downloadResolved(platformId, newFile, resolved)
+        if (updateCancelRequested) DownloadManager.cancelDownload(url)
         activeDownload = future
         val result = try {
             future.get()
@@ -1787,6 +1825,7 @@ object PackScreensAddition {
             UpdateStatus.UPDATED -> localize("resourcify.pack_updates.status.updated")
             UpdateStatus.FAILED -> localize("resourcify.pack_updates.status.failed")
             UpdateStatus.CANCELLED -> localize("resourcify.pack_updates.status.cancelled")
+            UpdateStatus.BROWSER -> localize("resourcify.download.open_browser")
         }
     }
 
@@ -2152,6 +2191,7 @@ object PackScreensAddition {
     }
 
     private enum class UpdateStatus {
+        BROWSER,
         PENDING,
         UPDATING,
         UPDATED,

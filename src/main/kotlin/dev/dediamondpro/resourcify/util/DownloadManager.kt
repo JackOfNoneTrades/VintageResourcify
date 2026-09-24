@@ -17,6 +17,9 @@
 
 package dev.dediamondpro.resourcify.util
 
+import dev.dediamondpro.resourcify.api.DownloadChecksum
+import dev.dediamondpro.resourcify.api.DownloadTarget
+import dev.dediamondpro.resourcify.services.DistributionPolicy
 import org.apache.commons.compress.archivers.zip.ZipFile
 import java.io.File
 import java.io.FileOutputStream
@@ -47,8 +50,24 @@ object DownloadManager {
         file: File, sha512: String? = null, url: URL,
         extract: Boolean = false, callback: (() -> Unit)? = null,
     ): CompletableFuture<DownloadResult> {
+        val checksum = sha512?.takeIf { it.isNotBlank() }
+            ?.let { DownloadChecksum(DownloadChecksum.Algorithm.SHA1, it) }
+        return enqueue(file, checksum, url, extract, callback)
+    }
+
+    fun downloadResolved(platformId: String, file: File, target: DownloadTarget): CompletableFuture<DownloadResult> {
+        if (!DistributionPolicy.canDownloadFrom(platformId) || target.isBrowser) {
+            return CompletableFuture.completedFuture(DownloadResult.FAILED)
+        }
+        return enqueue(file, target.checksum, target.url, false, null)
+    }
+
+    private fun enqueue(
+        file: File, checksum: DownloadChecksum?, url: URL,
+        extract: Boolean, callback: (() -> Unit)?,
+    ): CompletableFuture<DownloadResult> {
         val result = CompletableFuture<DownloadResult>()
-        queuedDownloads[url] = QueuedDownload(file, sha512, extract, callback, result)
+        queuedDownloads[url] = QueuedDownload(file, checksum, extract, callback, result)
         downloadNext()
         return result
     }
@@ -109,11 +128,10 @@ object DownloadManager {
                 }
             }
             checkNotCancelled(queuedDownload.cancelled)
-            queuedDownload.sha1?.let {
-                val hash = Utils.getSha1(tempFile)
-                if (hash == it) return@let
+            queuedDownload.checksum?.let {
+                if (it.matches(tempFile)) return@let
                 tempFile.delete()
-                error("Hash $hash does not match expected hash $it!")
+                error("Downloaded file does not match the expected ${it.algorithm} checksum")
             }
             checkNotCancelled(queuedDownload.cancelled)
             if (queuedDownload.extract) {
@@ -200,7 +218,7 @@ object DownloadManager {
 
 private data class QueuedDownload(
     val file: File,
-    val sha1: String?,
+    val checksum: DownloadChecksum?,
     val extract: Boolean,
     val callback: (() -> Unit)?,
     val result: CompletableFuture<DownloadResult>,

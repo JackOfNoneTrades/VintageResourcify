@@ -43,6 +43,16 @@ data class ModrinthVersion(
     @Transient
     private var dependenciesRequest: CompletableFuture<List<ModrinthDependency>>? = null
 
+    @Transient
+    private var service: ModrinthApiService? = null
+
+    internal fun bindService(service: ModrinthApiService): ModrinthVersion {
+        this.service = service
+        return this
+    }
+
+    private fun service(): ModrinthApiService = service ?: ModrinthService
+
     override fun getName(): String = name
     override fun getVersionNumber(): String = versionNumber
     override fun getProjectId(): String = projectId
@@ -68,10 +78,10 @@ data class ModrinthVersion(
                 it.projectId != null && DependencyType.fromString(it.dependencyType) != null
             }
             val idString = requiredDependencies.joinToString(",", "[", "]") { "\"${it.projectId}\"" }
-            URIBuilder("${ModrinthService.API}/projects").setParameter("ids", idString)
+            URIBuilder("${service().apiUrl}/projects").setParameter("ids", idString)
                 .build().toURL().getJson<List<FullModrinthProject>>()?.map {
                     ModrinthDependency(
-                        it,
+                        it.bindService(service()),
                         DependencyType.fromString(requiredDependencies.first { d -> d.projectId == it.getId() }.dependencyType)!!
                     )
                 } ?: emptyList()

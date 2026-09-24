@@ -18,6 +18,7 @@
 package dev.dediamondpro.resourcify.gui.pack
 
 import dev.dediamondpro.resourcify.VintageResourcify
+import dev.dediamondpro.resourcify.services.ServiceRegistry
 import dev.dediamondpro.resourcify.config.ConfiguredPlatforms
 import dev.dediamondpro.resourcify.util.ClientGuiTasks
 import dev.dediamondpro.resourcify.util.LocalIndex
@@ -136,7 +137,10 @@ object PackOverlayRenderer {
             else -> platform.lowercase()
         }
         return textures.getOrPut(key) {
-            if (key in setOf("curse", "modrinth", "67", "git")) {
+            val addonIcon = ServiceRegistry.getIcon(platform)
+            if (addonIcon != null) {
+                PlatformTexture(addonIcon, 16, 16)
+            } else if (key in setOf("curse", "modrinth", "67", "git")) {
                 PlatformTexture(ResourceLocation(VintageResourcify.MODID, "platform/$key.png"), 16, 16)
             } else {
                 loadConfiguredIcon(key) ?: return null
@@ -637,7 +641,8 @@ object PackOverlayRenderer {
         }
     }
 
-    private fun displayName(platform: String): String = when (platform.lowercase()) {
+    private fun displayName(platform: String): String = ServiceRegistry.getServiceById(platform)?.getName()
+        ?: when (platform.lowercase()) {
         "curse", "curseforge" -> "CurseForge"
         "modrinth" -> "Modrinth"
         "67minecraft", "67" -> "67Minecraft"

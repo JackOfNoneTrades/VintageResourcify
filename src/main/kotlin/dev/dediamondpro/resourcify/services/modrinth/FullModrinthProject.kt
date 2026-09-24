@@ -105,7 +105,7 @@ data class FullModrinthProject(
     }
 
     override fun getMembers(): CompletableFuture<List<IMember>> = fetchMembers().thenApply { members ->
-        members?.map { it.user.apply { member = it } } ?: error("Failed to fetch members.")
+        members?.map { it.user.bindService(service()).apply { member = it } } ?: error("Failed to fetch members.")
     }
 
     private fun fetchMembers(): CompletableFuture<List<PartialModrinthProject.Member>?> {
@@ -123,6 +123,7 @@ data class FullModrinthProject(
     override fun getVersions(): CompletableFuture<List<IVersion>> {
         return (versionsRequest ?: supplyAsync {
             URL("${service().apiUrl}/project/$slug/version").getJson<List<ModrinthVersion>>()
+                ?.onEach { it.bindService(service()) }
                 ?.filter { it.hasFile() }
                 // Filter mods (jar files) out of datapack versions
                 ?.filter { projectType != "mod" || it.getLoaders().contains("datapack") }

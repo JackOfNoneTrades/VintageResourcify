@@ -20,6 +20,8 @@
  * For more details, see https://docs.gradle.org/8.0.1/userguide/java_library_plugin.html#sec:java_library_configurations_graph
  */
 dependencies {
+    testImplementation("junit:junit:4.13.2")
+    testRuntimeOnly("org.jetbrains.kotlin:kotlin-stdlib:2.3.10")
     devOnlyNonPublishable("com.falsepattern:forgelin-mc1.7.10:2.4.1-2.3.10")
 
     devOnlyNonPublishable("com.github.GTNewHorizons:ModularUI2:2.3.80-1.7.10:dev")

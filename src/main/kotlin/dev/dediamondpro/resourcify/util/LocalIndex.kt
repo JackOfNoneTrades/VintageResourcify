@@ -21,6 +21,7 @@ import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import dev.dediamondpro.resourcify.VintageResourcify
 import dev.dediamondpro.resourcify.services.IVersion
+import dev.dediamondpro.resourcify.api.IdentifiedVersion
 import java.io.File
 
 /**
@@ -60,6 +61,7 @@ class LocalIndex private constructor(private val folder: File) {
         /** Candidate-specific ignore token. A different future release is visible again. */
         val ignoredVersion: String? = null,
         val ignoredUpdates: List<IgnoredUpdate>? = null,
+        val remoteFileId: String? = null,
     )
 
     private data class IndexFile(val entries: MutableList<Entry> = mutableListOf())
@@ -117,6 +119,8 @@ class LocalIndex private constructor(private val folder: File) {
                 installedReleaseDate = version?.getReleaseDate() ?: previous?.installedReleaseDate,
                 ignoredVersion = null,
                 ignoredUpdates = previous?.ignoredUpdates,
+                remoteFileId = (version as? IdentifiedVersion)?.getFileId()?.takeIf { it.isNotBlank() }
+                    ?: if (version == null) previous?.remoteFileId else null,
             )
         )
         save()
@@ -209,13 +213,17 @@ class LocalIndex private constructor(private val folder: File) {
         fun forFolder(folder: File): LocalIndex =
             cache.getOrPut(folder.canonicalFile) { LocalIndex(folder.canonicalFile) }
 
-        fun versionSignature(platform: String, version: IVersion): String = listOf(
-            platform,
-            version.getProjectId(),
-            version.getFileName(),
-            version.getSha1(),
-            version.getVersionNumber().orEmpty(),
-            version.getName(),
-        ).joinToString("\u001F")
+        fun versionSignature(platform: String, version: IVersion): String {
+            val fileId = (version as? IdentifiedVersion)?.getFileId()?.takeIf { it.isNotBlank() }
+            if (fileId != null) return listOf(platform, version.getProjectId(), "file-id", fileId).joinToString("\u001F")
+            return listOf(
+                platform,
+                version.getProjectId(),
+                version.getFileName(),
+                version.getSha1(),
+                version.getVersionNumber().orEmpty(),
+                version.getName(),
+            ).joinToString("\u001F")
+        }
     }
 }
