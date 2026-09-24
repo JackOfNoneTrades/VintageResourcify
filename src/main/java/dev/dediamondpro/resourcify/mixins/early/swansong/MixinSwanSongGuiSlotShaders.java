@@ -13,10 +13,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import com.ventooth.swansong.gui.GuiShaders;
+
 import dev.dediamondpro.resourcify.gui.pack.PackOverlayRenderer;
 import dev.dediamondpro.resourcify.util.SwanSongHelper;
 
-@Mixin(targets = "com.ventooth.swansong.gui.GuiShaders$GuiSlotShaders")
+@Mixin(GuiShaders.GuiSlotShaders.class)
 public abstract class MixinSwanSongGuiSlotShaders {
 
     @Shadow(remap = false)

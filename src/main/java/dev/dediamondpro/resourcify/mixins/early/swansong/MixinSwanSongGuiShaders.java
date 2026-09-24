@@ -8,12 +8,14 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import com.ventooth.swansong.gui.GuiShaders;
+
 import dev.dediamondpro.resourcify.gui.pack.PackOverlayRenderer;
 import dev.dediamondpro.resourcify.gui.pack.PackScreensAddition;
 import dev.dediamondpro.resourcify.services.ProjectType;
 import dev.dediamondpro.resourcify.util.SwanSongHelper;
 
-@Mixin(targets = "com.ventooth.swansong.gui.GuiShaders")
+@Mixin(GuiShaders.class)
 public class MixinSwanSongGuiShaders {
 
     @Inject(method = "drawScreen", at = @At("HEAD"))
