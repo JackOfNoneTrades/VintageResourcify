@@ -233,10 +233,9 @@ class BrowseScreen(
         }
     }
 
-    // Type switcher: two buttons, one per supported pack type. Hidden tab
-    // for shaders when Iris/Angelica isn't loaded. Width is set wide enough
-    // that "Resource Packs" fits on a single line at default font scale.
-    val shadersAvailable = ShaderGuiHelper.isPresent()
+    // Browsing and downloading shaders does not require a shader renderer.
+    // Keep "Resource Packs" on a single line at default font scale.
+    val shadersAvailable = Config.instance.shaderPacksEnabled
     val packsTab = SimpleButton().size(112, 18)
         .sodiumButton(style) { currentType == ProjectType.RESOURCE_PACK }
     val shadersTab = SimpleButton().size(112, 18)

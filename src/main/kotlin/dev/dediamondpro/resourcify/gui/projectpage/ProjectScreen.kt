@@ -428,6 +428,7 @@ class ProjectScreen(
     val downloadPanelTop = (sr0.scaledHeight - downloadPanelH) / 2
     val downloadTextW = downloadPanelW - 2 * DOWNLOAD_PANEL_PAD - 8
     val isShader = type == ProjectType.IRIS_SHADER || type == ProjectType.OPTIFINE_SHADER
+    val canManagePacks = !isShader || ShaderGuiHelper.isPresent()
     val manageScreenLabel = if (isShader) {
         localize("resourcify.download.go_to_shaders")
     } else {
@@ -459,8 +460,8 @@ class ProjectScreen(
                 state == DownloadPanelState.FAILED || state == DownloadPanelState.BROWSER
         )
         cancelButtonHolder[0]?.setEnabled(state == DownloadPanelState.DOWNLOADING)
-        enableButtonHolder[0]?.setEnabled(state == DownloadPanelState.DONE)
-        manageButtonHolder[0]?.setEnabled(state == DownloadPanelState.DONE)
+        enableButtonHolder[0]?.setEnabled(state == DownloadPanelState.DONE && canManagePacks)
+        manageButtonHolder[0]?.setEnabled(state == DownloadPanelState.DONE && canManagePacks)
         closeButtonHolder[0]?.setEnabled(state != DownloadPanelState.DOWNLOADING)
         progressBarHolder[0]?.setEnabled(state == DownloadPanelState.DOWNLOADING || state == DownloadPanelState.DONE)
     }
